@@ -5,5 +5,5 @@ CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
 #LIBS="-lm `pkg-config --libs raylib` -lglfw -ldl -lpthread"
 LIBS="`pkg-config --libs raylib` -lglfw -ldl"
 
-gcc $CFLAGS main.c $LIBS
+gcc $CFLAGS $1 $LIBS
 ./a.out
