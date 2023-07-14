@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <time.h>
 #include <raylib.h>
 
@@ -12,7 +11,7 @@ struct Coord
 typedef struct
 {
      Texture2D sprite;
-     short unsigned x, y;
+     short unsigned x, y, speed;
 } Entity;
 
 struct Coord w = {
@@ -24,8 +23,13 @@ Entity player, enemy, backgrass, apple, grass, tree, bomb;
 
 void Init (void)
 {
-     srand(clock());
-     player.sprite = LoadTexture ("res/images/player.png");
+     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+     InitWindow(w.x, w.y, "Pixper");
+     SetTargetFPS(60);
+     SetTraceLogLevel(LOG_ERROR);
+     SetRandomSeed(clock());
+     player.sprite = LoadTexture ("res/images/player-black.png");
+     player.speed = 5;
      apple.sprite = LoadTexture ("res/images/apple.png");
      grass.sprite = LoadTexture ("res/images/grasstile.png");
      tree.sprite = LoadTexture ("res/images/tree.png");
@@ -34,32 +38,34 @@ void Init (void)
 
 void Movement (void)
 {
-     int key;
-     key = GetKeyPressed();
-     switch (key)
-     {
-          case KEY_W:
-               player.y -= GetFrameTime()*800;
-               break;
-          case KEY_A:
-               player.x -= GetFrameTime()*800;
-               break;
-          case KEY_S:
-               player.y += GetFrameTime()*800;
-               break;
-          case KEY_D:
-               player.x += GetFrameTime()*800;
-          default:
-               break;
-     }
-     //if (player.y < 20)
-          //fprintf (stderr, "(%f %f)\n", player.x, player.y);
+     bool k[4] = {
+          IsKeyDown(KEY_W) || IsKeyDown(KEY_UP),
+          IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT),
+          IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN),
+          IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT),
+     };
+     if (k[0])
+          player.y -= player.speed;
+     if (k[1])
+          player.x -= player.speed;
+     if (k[2])
+          player.y += player.speed;
+     if (k[3])
+          player.x += player.speed;
+     if (player.x <= 5)
+          player.x = 5;
+     if (player.y <= 5)
+          player.y = 5;
+     if (player.x >= w.x-32)
+          player.x = w.x-32;
+     if (player.y >= w.y-32)
+          player.y = w.y-32;
 }
 
 void GenerateEntity (Entity *entity)
 {
-     entity->x = rand() % (w.x-32);
-     entity->y = rand() % (w.y-32);
+     entity->x = GetRandomValue (5, w.x-32);
+     entity->y = GetRandomValue (5, w.y-32);
 }
 
 void DrawEntity (Entity *entity)
@@ -73,7 +79,6 @@ void DrawBackground (void)
      for (short unsigned i = 0; i < w.x; i += 256)
           for (short unsigned j = 0; j < w.y; j += 256)
                DrawTexture (backgrass.sprite, i, j, WHITE);
-     //UnloadTexture (backgrass);
 }
 
 void LogCoords (void)
@@ -87,10 +92,7 @@ void LogCoords (void)
 
 int main (void)
 {
-     InitWindow(w.x, w.y, "Pixper");
-     SetTargetFPS(60);
      Init();
-     //DrawBackground();
      GenerateEntity (&apple);
      GenerateEntity (&grass);
      GenerateEntity (&tree);
@@ -99,18 +101,29 @@ int main (void)
      LogCoords();
      while (!WindowShouldClose())
      {
+          w.x = GetScreenWidth();
+          w.y = GetScreenHeight();
           Movement();
           BeginDrawing();
                ClearBackground(BLACK);
+               DrawBackground();
                DrawEntity (&apple);
                DrawEntity (&grass);
                DrawEntity (&tree);
                DrawEntity (&bomb);
-               DrawTexture (player.sprite, player.x, player.y, GREEN);
+               DrawEntity (&player);
+               if (IsWindowResized())
+               {
+                    GenerateEntity (&apple);
+                    GenerateEntity (&grass);
+                    GenerateEntity (&tree);
+                    GenerateEntity (&bomb);
+               }
           EndDrawing();
           if (IsKeyPressed (KEY_Q))
                break;
      }
+     UnloadTexture (backgrass.sprite);
      UnloadTexture (player.sprite);
      UnloadTexture (grass.sprite);
      UnloadTexture (apple.sprite);
