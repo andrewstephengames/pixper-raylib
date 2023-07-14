@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -xe
+CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
+#LIBS="-lm `pkg-config --libs raylib` -lglfw -ldl -lpthread"
+LIBS="`pkg-config --libs raylib` -lglfw -ldl"
+
+gcc $CFLAGS main.c $LIBS
+./a.out
