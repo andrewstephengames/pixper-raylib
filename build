@@ -3,7 +3,7 @@
 set -xe
 CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
 #LIBS="-lm `pkg-config --libs raylib` -lglfw -ldl -lpthread"
-LIBS="`pkg-config --libs raylib` -lglfw -ldl"
+LIBS="`pkg-config --libs raylib` -lglfw -ldl -lm"
 
 gcc $CFLAGS $1 $LIBS
 ./a.out
