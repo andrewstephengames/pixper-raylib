@@ -25,6 +25,7 @@ typedef struct
 {
      bool close, mutemusic, mutesound, help, version, cleardb;
      int score, health;
+     float delay;
 } Game;
 
 Window w = {
@@ -112,6 +113,7 @@ void Init (void)
      SetRandomSeed(clock());
 
      game.health = 10;
+     game.delay = (int) (0x1000*GetFrameTime());
      
      sound[1] = LoadSound ("res/sounds/oof.ogg");
      sound[2] = LoadSound ("res/sounds/eat.ogg");
@@ -239,19 +241,20 @@ void CalcCollisions (void)
                PlaySound (sound[3]); //boom
                player[1].speed += 0.10f;
                bomb[i].used = 1;
-               //bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
                bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
           }
      }
-     //if the player and enemy collide
      if (IsCollision(&player[0], &player[1], 15))
-     {
-          PlaySound (sound[1]); //oof
-          player[0].speed -= 0.001f;
-          if (player[0].speed < 0.0f)
-               player[0].speed = 0.0f;
-          game.health--;
-     }
+          if (game.delay == 0.0f)
+          {
+               PlaySound (sound[1]); //oof
+               player[0].speed -= 0.001f;
+               if (player[0].speed < 0.0f)
+                    player[0].speed = 0.0f;
+               game.health--;
+               game.delay = (int) (0x1000*GetFrameTime());
+          }
+          else game.delay--;
 }
 
 // https://www.geeksforgeeks.org/implement-itoa/
