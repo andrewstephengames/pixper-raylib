@@ -1,9 +1,7 @@
 /*
-     GenerateEntity (apple);
-     GenerateEntity (grass);
-     GenerateEntity (tree);
-     GenerateEntity (bomb);
-     GenerateEntity (player);
+     sound[1] = LoadSound ("res/sounds/oof.ogg");
+     sound[2] = LoadSound ("res/sounds/eat.ogg");
+     sound[3] = LoadSOund ("res/sounds/boom.ogg");
 */
 #include <stdio.h>
 #include <string.h>
