@@ -328,10 +328,10 @@ int main (int argc, char **argv)
 {
      Init();
      // command-line args
-     for (int i = 2; i <= argc && argc > 1; i++)
+     for (int i = 1; i < argc && argc > 1; i++)
           if (strcmp (argv[i], "mutemusic") == 0)
           {
-               printf ("%d: %s\n", argc, argv[i]);
+               printf ("arg[%d] == %s\n", argc, argv[i]);
                PauseMusicStream(music[0]);
                game.mutemusic = 1;
           }
