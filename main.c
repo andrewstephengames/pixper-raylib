@@ -23,9 +23,8 @@ typedef struct
 
 typedef struct
 {
-     bool close, mutemusic, mutesound, help, version, cleardb;
-     int score, health;
-     float delay;
+     bool end, close, mutemusic, mutesound, help, version, cleardb;
+     int score, health, hitdelay, enddelay;
 } Game;
 
 Window w = {
@@ -105,23 +104,24 @@ void GenerateEntities (void)
 
 void Init (void)
 {
-     InitWindow(w.x, w.y, "Pixper");
      SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+     InitWindow(w.x, w.y, "Pixper");
      InitAudioDevice();
      SetTargetFPS(60);
      SetTraceLogLevel(LOG_ERROR);
      SetRandomSeed(clock());
 
      game.health = 10;
-     game.delay = (int) (0x1000*GetFrameTime());
+     game.hitdelay = 0x1000*GetFrameTime();
+     game.enddelay = 0x1000*GetFrameTime();
      
      sound[1] = LoadSound ("res/sounds/oof.ogg");
      sound[2] = LoadSound ("res/sounds/eat.ogg");
      sound[3] = LoadSound ("res/sounds/boom.ogg");
 
      size_t soundsize;
-     soundsize = sizeof(sound) / sizeof (Sound);
-     for (size_t i = 1; i < soundsize; i++)
+     soundsize = sizeof(sound) / sizeof (Sound) - 1;
+     for (size_t i = 1; i <= soundsize; i++)
           SetSoundVolume(sound[i], 0.10f);
 
      music[1] = LoadMusicStream("res/music/music1.ogg");     
@@ -195,6 +195,13 @@ void DrawEntities (void)
           DrawTexture (tree[i].sprite, tree[i].x, tree[i].y, WHITE);
      for (int i = 1; i <= bomb[0].num; i++)
           DrawTexture (bomb[i].sprite, bomb[i].x, bomb[i].y, WHITE);
+     if (game.score > apple[0].num * 0.75f)
+     {
+          //TODO: do mid window coords
+          DrawText ("Hidden apples have been revealed!", 50, 50, 25, YELLOW);
+          for (int i = 1; i <= apple[0].num; i++)
+               DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
+     }
      DrawTexture (player[0].sprite, player[0].x, player[0].y, WHITE);
      DrawTexture (player[1].sprite, player[1].x, player[1].y, WHITE);
 }
@@ -245,16 +252,18 @@ void CalcCollisions (void)
           }
      }
      if (IsCollision(&player[0], &player[1], 15))
-          if (game.delay == 0.0f)
+     {
+          if (game.hitdelay == 0.0f)
           {
                PlaySound (sound[1]); //oof
                player[0].speed -= 0.001f;
                if (player[0].speed < 0.0f)
                     player[0].speed = 0.0f;
                game.health--;
-               game.delay = (int) (0x1000*GetFrameTime());
+               game.hitdelay = 0x1000*GetFrameTime();
           }
-          else game.delay--;
+          else game.hitdelay--;
+     }
 }
 
 // https://www.geeksforgeeks.org/implement-itoa/
@@ -301,13 +310,27 @@ void DrawHUD (void)
      DrawText (h, 10, 35, 30, RED);
      if (game.health <= 0)
      {
+          game.health = 0;
+          //TODO: do mid window coords
           DrawText ("You Died!", 50, 50, 50, GRAY);
-          game.close = 1;
+          game.end = 1;
+          //make death screen stall for a second or two
      }
      if (game.score == apple[0].num)
      {
+          //TODO: do mid window coords
           DrawText ("You Won!", 50, 50, 50, YELLOW);
-          game.close = 1;
+          game.end = 1;
+     }
+     if (game.end)
+     {
+          //TODO: endgame delay
+          if (game.enddelay == 0)
+          {
+               game.close = 1;    
+               game.enddelay = 0xFFFF * GetFrameTime();
+          }
+          else game.enddelay--;
      }
 }
 
