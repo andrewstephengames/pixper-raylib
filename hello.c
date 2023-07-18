@@ -1,7 +1,9 @@
 /*
-     sound[1] = LoadSound ("res/sounds/oof.ogg");
-     sound[2] = LoadSound ("res/sounds/eat.ogg");
-     sound[3] = LoadSOund ("res/sounds/boom.ogg");
+          char s[] = "Hello World\0";
+          size_t mid, size = 50;
+          if (strlen(s) % 2 == 0)
+               mid = w.x/2-size/5*strlen (s);
+          else mid = w.x/2-size/5*strlen (s) + 1;
 */
 #include <stdio.h>
 #include <string.h>
@@ -9,20 +11,10 @@
 #include <time.h>
 #include <raylib.h>
 
-struct Coord
+typedef struct 
 {
-     float x, y;
-};
-
-struct Coord w = {
-     .x = 800,
-     .y = 600
-};
-
-struct Coord c = {
-     .x = 0,
-     .y = 300
-};
+     int x, y;
+} Window;
 
 typedef struct
 {
@@ -30,82 +22,45 @@ typedef struct
      short x, y, speed, num, score;
 } Entity;
 
+Window w = {
+     .x = 800,
+     .y = 600
+};
+
 Entity a[50], b, cc[1], dd[2];
-short health = 10;
+int health = 10;
 
-void test (Entity entity[])
+Window CenterText (const char *s, int size)
 {
-     size_t n = sizeof(*entity);
-     printf ("n == %zu\n", n);
-     return;
+     return (Window) {
+          .x = w.x/2 - MeasureText (s, size)/2,
+          .y = w.y/2 - size/2,
+     };
 }
 
-// https://www.geeksforgeeks.org/implement-itoa/
-
-void reverse(char s[]) // "The C Programming Language" implementation
- {
-     short i, j;
-     char c;
- 
-     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-         c = s[i];
-         s[i] = s[j];
-         s[j] = c;
-     }
- }
-
- void itoa(short n, char s[]) // "The C Programming Language" implementation
- {
-     short i, sign;
- 
-     if ((sign = n) < 0)  /* record sign */
-         n = -n;          /* make n positive */
-     i = 0;
-     do {       /* generate digits in reverse order */
-         s[i++] = n % 10 + '0';   /* get next digit */
-     } while ((n /= 10) > 0);     /* delete it */
-     if (sign < 0)
-         s[i++] = '-';
-     s[i] = '\0';
-     reverse(s);
- }
-
-void DrawHUD (void)
+int main (void)
 {
-     char s[30];
-     strcpy (s, "Health: ");
-     char t[30];
-     itoa (1234, t);
-     strcat (s, t);
-     printf ("%s\n", s);
-     return;
-//     DrawText (s, 10, 10, 20, RED);
-}
-
-int main ()
-{
-     short d = 1;
-     //printf ("%s", itoa(1234));
-     DrawHUD();
-     return 0;
-     //printf ("sizeof(a) == %ld\n", sizeof(a)/sizeof(Entity));
-     //printf ("sizeof(Entity) == %ld\n", sizeof(Entity));
-     //printf ("sizeof(cc) == %ld\n", sizeof(cc)/sizeof(Entity));
-     //printf ("sizeof(dd) == %ld\n", sizeof(dd)/sizeof(Entity));
-     //test(a);
-     //printf ("sizeof(Texture2D) == %zu\n", sizeof(Texture2D));
-     //printf ("sizeof(short) == %zu\n", sizeof(short));
-     //return 0;
+     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
      InitWindow(w.x, w.y, "Pixper");
      SetTargetFPS(60);
      while (!WindowShouldClose())
      {
-          c.x += GetFrameTime()*400*d;
-          if (c.x >= w.x-100 || c.x <= 0)
-               d *= -1;
+          w.x = GetScreenWidth ();
+          w.y = GetScreenHeight ();
+          char s[] = "Hello World\0";
+          int size = w.x / 20;
+          Window mid = CenterText (s, size);
+          
           BeginDrawing();
                ClearBackground(BLACK);
-               DrawText("Hello World", c.x, c.y, 20, BLUE);
+               //if (IsWindowMaximized())
+               if (IsWindowResized ())
+                    DrawText(s, mid.x, mid.y, size, BLUE);
+               if (IsWindowResized() && IsWindowMaximized())
+               {
+                    printf ("(%d %d)\n", mid.x, mid.y);
+                    DrawText(strchr(s, ' ')+1, mid.x, mid.y, size, BLUE);
+               }
           EndDrawing();
           if (IsKeyPressed(KEY_Q))
                break;
