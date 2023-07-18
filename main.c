@@ -23,13 +23,13 @@ typedef struct
 
 typedef struct
 {
-     bool end, close, mutemusic, mutesound, help, version, cleardb;
-     int score, health, hitdelay, enddelay;
+     bool close, mutemusic, mutesound, help, version, cleardb;
+     int score, health, delay;
 } Game;
 
 Window w = {
-     .x = 800,
-     .y = 600,
+     .x = 1280,
+     .y = 720,
 };
 
 Entity player[2], background, apple[E_SZ], grass[E_SZ], tree[E_SZ], bomb[E_SZ];
@@ -42,6 +42,7 @@ bool IsCollision (Entity *a, Entity *b, float c)
      float d = sqrt((pow(b->x-a->x, 2) + pow(b->y-a->y, 2)));
      return d < c; //distance has to be smaller than collision coefficient
 }
+
 
 void GenerateEntities (void)
 {
@@ -88,14 +89,14 @@ void GenerateEntities (void)
      player[1].x = GetRandomValue (5, w.x-32);
      player[1].y = GetRandomValue (5, w.y-32);
      // prevent the enemy from spawning on top of, or near the player
-     while (IsCollision (&player[0], &player[1], 25))
+     while (IsCollision (&player[0], &player[1], 50))
      {
           player[1].x = GetRandomValue (5, w.x-32);
           player[1].y = GetRandomValue (5, w.y-32);
      }
      // prevent bombs generating on top of, or near the player
      for (int i = 1; i <= bomb[0].num; i++)
-     while (IsCollision(&player[0], &bomb[i], 25))
+     while (IsCollision(&player[0], &bomb[i], 50))
      {
           player[0].x = GetRandomValue (5, w.x-32);
           player[0].y = GetRandomValue (5, w.y-32);
@@ -112,8 +113,7 @@ void Init (void)
      SetRandomSeed(clock());
 
      game.health = 10;
-     game.hitdelay = 0x1000*GetFrameTime();
-     game.enddelay = 0x1000*GetFrameTime();
+     game.delay = 0x1000*GetFrameTime();
      
      sound[1] = LoadSound ("res/sounds/oof.ogg");
      sound[2] = LoadSound ("res/sounds/eat.ogg");
@@ -185,6 +185,14 @@ void EnemyMovement (void)
           player[1].y = w.y-32;
 }
 
+Window CenterText (const char *s, int size)
+{
+     return (Window) {
+          .x = w.x/2 - MeasureText (s, size)/2,
+          .y = w.y/2 - size/2,
+     };
+}
+
 void DrawEntities (void)
 {
      for (int i = 1; i <= apple[0].num; i++)
@@ -195,10 +203,12 @@ void DrawEntities (void)
           DrawTexture (tree[i].sprite, tree[i].x, tree[i].y, WHITE);
      for (int i = 1; i <= bomb[0].num; i++)
           DrawTexture (bomb[i].sprite, bomb[i].x, bomb[i].y, WHITE);
-     if (game.score > apple[0].num * 0.75f)
+     if (game.score > apple[0].num * 0.75f && game.score < apple[0].num * 0.85f)
      {
-          //TODO: do mid window coords
-          DrawText ("Hidden apples have been revealed!", 50, 50, 25, YELLOW);
+          char s[] = "Hidden apples have been revealed!\0";
+          int size = w.x/20;
+          Window mid = CenterText (s, size);
+          DrawText (s, mid.x, mid.y, size, YELLOW);
           for (int i = 1; i <= apple[0].num; i++)
                DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
      }
@@ -253,16 +263,16 @@ void CalcCollisions (void)
      }
      if (IsCollision(&player[0], &player[1], 15))
      {
-          if (game.hitdelay == 0.0f)
+          if (game.delay == 0.0f)
           {
                PlaySound (sound[1]); //oof
                player[0].speed -= 0.001f;
                if (player[0].speed < 0.0f)
                     player[0].speed = 0.0f;
                game.health--;
-               game.hitdelay = 0x1000*GetFrameTime();
+               game.delay = 0x1000*GetFrameTime();
           }
-          else game.hitdelay--;
+          else game.delay--;
      }
 }
 
@@ -297,6 +307,7 @@ void itoa(int n, char s[])
      reverse(s);
 }
 
+
 void DrawHUD (void)
 {
      char s[30], h[30], t[30];
@@ -311,26 +322,20 @@ void DrawHUD (void)
      if (game.health <= 0)
      {
           game.health = 0;
-          //TODO: do mid window coords
-          DrawText ("You Died!", 50, 50, 50, GRAY);
-          game.end = 1;
-          //make death screen stall for a second or two
+          strcpy (s, "You Died!");
+          int size = 50;
+          Window mid = CenterText (s, size);
+          DrawText (s, mid.x, mid.y, size, GRAY);
+          game.close = 1;
+          //TODO: make end game menu
      }
      if (game.score == apple[0].num)
      {
-          //TODO: do mid window coords
-          DrawText ("You Won!", 50, 50, 50, YELLOW);
-          game.end = 1;
-     }
-     if (game.end)
-     {
-          //TODO: endgame delay
-          if (game.enddelay == 0)
-          {
-               game.close = 1;    
-               game.enddelay = 0xFFFF * GetFrameTime();
-          }
-          else game.enddelay--;
+          strcpy (s, "You won!");
+          int size = 50;
+          Window mid = CenterText (s, size);
+          DrawText (s, mid.x, mid.y, size, YELLOW);
+          game.close = 1;
      }
 }
 
@@ -374,10 +379,11 @@ int main (int argc, char **argv)
                DrawEntities();
                DrawHUD();
           EndDrawing();
-          if (IsWindowResized() || IsWindowMaximized()) //TODO: Maximized
+          if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
           {
                GenerateEntities();
                DrawEntities();
+               DrawHUD();
           }
           if (IsKeyPressed (KEY_Q) || game.close)
                break;
