@@ -2,8 +2,9 @@
 
 set -xe
 CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
+
 #LIBS="-lm `pkg-config --libs raylib` -lglfw -ldl -lpthread"
-LIBS="`pkg-config --libs raylib` -lglfw -ldl -lm"
+LIBS="`pkg-config --libs raylib` -lglfw -ldl -lm -lsqlite3"
 
 gcc $CFLAGS $1 $LIBS
 ./a.out mutemusic
