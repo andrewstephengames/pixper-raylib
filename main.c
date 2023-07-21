@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> //for strcat and strcpy
+#include <string.h> //for strcat, strcpy and strlen
 #include <math.h> //for sqrt and pow (collisions)
 #include <time.h> //for clock() (random seed)
+#include <sqlite3.h> //for db
 #include <raylib.h>
 
 #define PLATFORM_DESKTOP
@@ -36,13 +37,24 @@ Entity player[2], background, apple[E_SZ], grass[E_SZ], tree[E_SZ], bomb[E_SZ];
 Sound sound[4];
 Music music[4];
 Game game;
+sqlite3 *db;
+char *err_msg, *sql;
+int rc;
+
+int callback(void *NotUsed, int argc, char **argv, char **azColName)
+{
+     NotUsed = 0;
+     for (int i = 0; i < argc; i++)
+          printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+     printf("\n");
+     return 0;
+}
 
 bool IsCollision (Entity *a, Entity *b, float c)
 {
      float d = sqrt((pow(b->x-a->x, 2) + pow(b->y-a->y, 2)));
      return d < c; //distance has to be smaller than collision coefficient
 }
-
 
 void GenerateEntities (void)
 {
@@ -111,6 +123,9 @@ void Init (void)
      SetTargetFPS(60);
      SetTraceLogLevel(LOG_ERROR);
      SetRandomSeed(clock());
+     rc = sqlite3_open ("res/db/stats.db", &db);
+     sql = "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER)" //Hard BOOLEAN)"
+           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG REAL PRIMARY KEY)";
 
      game.health = 10;
      game.delay = 0x1000*GetFrameTime();
@@ -119,8 +134,7 @@ void Init (void)
      sound[2] = LoadSound ("res/sounds/eat.ogg");
      sound[3] = LoadSound ("res/sounds/boom.ogg");
 
-     size_t soundsize;
-     soundsize = sizeof(sound) / sizeof (Sound) - 1;
+     size_t soundsize = sizeof(sound) / sizeof (Sound) - 1;
      for (size_t i = 1; i <= soundsize; i++)
           SetSoundVolume(sound[i], 0.10f);
 
@@ -276,49 +290,13 @@ void CalcCollisions (void)
      }
 }
 
-// https://www.geeksforgeeks.org/implement-itoa/
-
-void reverse(char s[])
-{
-     int i, j;
-     char c;
- 
-     for (i = 0, j = strlen(s)-1; i<j; i++, j--)
-     {
-         c = s[i];
-         s[i] = s[j];
-         s[j] = c;
-     }
-}
-
-void itoa(int n, char s[])
-{
-     int i, sign;
- 
-     if ((sign = n) < 0)  /* record sign */
-         n = -n;          /* make n positive */
-     i = 0;
-     do {       /* generate digits in reverse order */
-         s[i++] = n % 10 + '0';   /* get next digit */
-     } while ((n /= 10) > 0);     /* delete it */
-     if (sign < 0)
-         s[i++] = '-';
-     s[i] = '\0';
-     reverse(s);
-}
-
-
 void DrawHUD (void)
 {
-     char s[30], h[30], t[30];
-     strcpy (s, "Score: ");
-     strcpy (h, "Health: ");
-     itoa (game.score, t);
-     strcat (s, t);
-     itoa (game.health, t);
-     strcat (h, t);
-     DrawText (s, 10, 10, 30, DARKBLUE);
-     DrawText (h, 10, 35, 30, RED);
+     char buffer[30], s[30];
+     snprintf (buffer, 30, "%s: %d", "Score", game.score);
+     DrawText (buffer, 10, 10, 30, DARKBLUE);
+     snprintf (buffer, 30, "%s: %d", "Health", game.health);
+     DrawText (buffer, 10, 35, 30, RED);
      if (game.health <= 0)
      {
           game.health = 0;
@@ -355,6 +333,12 @@ void LogCoords (void)
 int main (int argc, char **argv)
 {
      Init();
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
+          sqlite3_close(db);
+          return 1;
+     }
      // command-line args
      for (int i = 1; i < argc && argc > 1; i++)
           if (strcmp (argv[i], "mutemusic") == 0)
@@ -403,5 +387,6 @@ int main (int argc, char **argv)
      StopMusicStream(music[0]);
      CloseAudioDevice();
      CloseWindow();
+     sqlite3_close(db);
      return 0;
 }
