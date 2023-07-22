@@ -20,6 +20,7 @@ typedef struct
      Texture2D sprite;
      int num;
      bool used;
+     char name[30];
 } Entity;
 
 typedef struct
@@ -38,7 +39,7 @@ Sound sound[4];
 Music music[4];
 Game game;
 sqlite3 *db;
-char *err_msg, *sql;
+char *err_msg, sql[500];
 int rc;
 
 int callback(void *NotUsed, int argc, char **argv, char **azColName)
@@ -94,12 +95,14 @@ void GenerateEntities (void)
      player[0].num = 1; //might add support for multiple players
      player[0].x = GetRandomValue (5, w.x-32);
      player[0].y = GetRandomValue (5, w.y-32);
+     strcpy (player[0].name, "Player");
      // player[1] is the enemy
      player[1].sprite = LoadTexture ("res/images/enemy-black.png");
      player[1].speed = 1.5f;
      player[1].num = 1; //might add support for multiple enemies
      player[1].x = GetRandomValue (5, w.x-32);
      player[1].y = GetRandomValue (5, w.y-32);
+     strcpy (player[1].name, "Enemy");
      // prevent the enemy from spawning on top of, or near the player
      while (IsCollision (&player[0], &player[1], 50))
      {
@@ -124,8 +127,10 @@ void Init (void)
      SetTraceLogLevel(LOG_ERROR);
      SetRandomSeed(clock());
      rc = sqlite3_open ("res/db/stats.db", &db);
-     sql = "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER)" //Hard BOOLEAN)"
-           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG REAL PRIMARY KEY)";
+     strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER);" //Hard BOOLEAN)"
+           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG INTEGER PRIMARY KEY, Name TEXT);");
+     
+     rc = sqlite3_exec(db, sql, 0, 0, &err_msg); //update db
 
      game.health = 10;
      game.delay = 0x1000*GetFrameTime();
@@ -241,6 +246,7 @@ void DrawBackground (void)
 
 void CalcCollisions (void)
 {
+     char buffer[101];
      for (int i = 1; i <= apple[0].num; i++)
           //if the player collides with an apple
           if (IsCollision (&player[0], &apple[i], 10) && !apple[i].used)
@@ -251,6 +257,10 @@ void CalcCollisions (void)
                apple[i].used = 1;
                apple[i].sprite = LoadTexture ("res/images/grasstile.png");
                PlaySound (sound[2]); //eat
+               int rng = (apple[i].x + apple[i].y)/2;
+               sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[0].name, rng, "Apple");
+               strcpy (sql, buffer);
+               rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
           }
      for (int i = 1; i <= bomb[0].num; i++)
      {
@@ -265,6 +275,10 @@ void CalcCollisions (void)
                     player[0].speed = 0.0f;
                bomb[i].used = 1;
                bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
+               int rng = (bomb[i].x + bomb[i].y)/2;
+               sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[0].name, rng, "Bomb");
+               strcpy (sql, buffer);
+               rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
           }
           //if the enemy collides with a bomb
           if (IsCollision(&player[1], &bomb[i], 30) && !bomb[i].used)
@@ -273,6 +287,10 @@ void CalcCollisions (void)
                player[1].speed += 0.10f;
                bomb[i].used = 1;
                bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
+               int rng = (bomb[i].x + bomb[i].y)/2;
+               sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[1].name, rng, "Bomb");
+               strcpy (sql, buffer);
+               rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
           }
      }
      if (IsCollision(&player[0], &player[1], 15))
@@ -292,7 +310,7 @@ void CalcCollisions (void)
 
 void DrawHUD (void)
 {
-     char buffer[30], s[30];
+     char buffer[101], s[30];
      snprintf (buffer, 30, "%s: %d", "Score", game.score);
      DrawText (buffer, 10, 10, 30, DARKBLUE);
      snprintf (buffer, 30, "%s: %d", "Health", game.health);
@@ -305,6 +323,9 @@ void DrawHUD (void)
           Window mid = CenterText (s, size);
           DrawText (s, mid.x, mid.y, size, GRAY);
           game.close = 1;
+          sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d');", player[1].name, game.score);
+          strcpy (sql, buffer);
+          rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
           //TODO: make end game menu
      }
      if (game.score == apple[0].num)
@@ -314,6 +335,9 @@ void DrawHUD (void)
           Window mid = CenterText (s, size);
           DrawText (s, mid.x, mid.y, size, YELLOW);
           game.close = 1;
+          sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d');", player[0].name, game.score);
+          strcpy (sql, buffer);
+          rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
      }
 }
 
@@ -387,6 +411,17 @@ int main (int argc, char **argv)
      StopMusicStream(music[0]);
      CloseAudioDevice();
      CloseWindow();
+     strcpy (sql, "SELECT * FROM Players");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     strcpy (sql, "SELECT * FROM Obstacles");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Failed to select data\n");
+          fprintf (stderr, "SQL Error: %s\n", err_msg);
+          sqlite3_close(db);
+          return 1;
+     }
      sqlite3_close(db);
      return 0;
 }
