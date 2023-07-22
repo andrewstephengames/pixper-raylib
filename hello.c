@@ -1,9 +1,6 @@
 /*
-          char s[] = "Hello World\0";
-          size_t mid, size = 50;
-          if (strlen(s) % 2 == 0)
-               mid = w.x/2-size/5*strlen (s);
-          else mid = w.x/2-size/5*strlen (s) + 1;
+     sql = "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER);" //Hard BOOLEAN)"
+           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG REAL PRIMARY KEY);";
 */
 #include <stdio.h>
 #include <string.h>
