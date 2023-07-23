@@ -77,6 +77,100 @@ sqlite3 *db;
 char *err_msg, sql[500];
 int rc;
 
+// all functions used
+int callback(void *NotUsed, int argc, char **argv, char **azColName);
+bool IsCollision (Entity *a, Entity *b, float c);
+void SetDifficulty (bool difficulty);
+void GenerateEntities (void);
+void Init (void);
+void PlayerMovement (void);
+void EnemyMovement (void);
+Window CenterText (const char *s, int size);
+void DrawEntities (void);
+void DrawBackground (void);
+void CalcCollisions (void);
+void LogCoords (void);
+
+int main (int argc, char **argv)
+{
+     Init();
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
+          sqlite3_close(db);
+          return 1;
+     }
+     // command-line args
+     for (int i = 1; i < argc && argc > 1; i++)
+     {
+          if (strcmp (argv[i], "mutemusic") == 0)
+          {
+               printf ("arg[%d] == %s\n", argc, argv[i]);
+               PauseMusicStream(music[0]);
+               game.mutemusic = 1;
+          }
+          if (strcmp (argv[i], "cleardb") == 0)
+          {
+               printf ("arg[%d] == %s\n", argc, argv[i]);
+               // truncate the res/db/stats.db file
+               game.cleardb = 1;
+          }
+     }
+     LogCoords();
+     while (!WindowShouldClose())
+     {
+          w.x = GetScreenWidth();
+          w.y = GetScreenHeight();
+          if (!game.mutemusic)
+               UpdateMusicStream(music[0]);
+          PlayerMovement();
+          EnemyMovement();
+          CalcCollisions();
+          BeginDrawing();
+               ClearBackground(BLACK);
+               DrawBackground();
+               DrawEntities();
+               DrawHUD();
+          EndDrawing();
+          if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
+          {
+               GenerateEntities();
+               DrawEntities();
+               DrawHUD();
+          }
+          if (IsKeyPressed (KEY_Q) || game.close)
+               break;
+          if (IsKeyPressed (KEY_F))
+               printf ("(%.3f %.3f)\n", player[0].x, player[0].y);
+     }
+     UnloadTexture (player[0].sprite);
+     UnloadTexture (background.sprite);
+     for (int i = 1; i < 100; i++)
+          if (grass[i].num || apple[i].num || bomb[i].num || tree[i].num)
+          {
+               UnloadTexture (grass[i].sprite);
+               UnloadTexture (apple[i].sprite);
+               UnloadTexture (bomb[i].sprite);
+               UnloadTexture (tree[i].sprite);
+          }
+     StopMusicStream(music[0]);
+     CloseAudioDevice();
+     CloseWindow();
+     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     strcpy (sql, "SELECT Playername, RNG, Name FROM Obstacles ORDER BY RNG DESC LIMIT 3");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Failed to select data\n");
+          fprintf (stderr, "SQL Error: %s\n", err_msg);
+          sqlite3_close(db);
+          return 1;
+     }
+     sqlite3_close(db);
+     return 0;
+}
+
 int callback(void *NotUsed, int argc, char **argv, char **azColName)
 {
      NotUsed = 0;
@@ -357,7 +451,6 @@ void DrawBackground (void)
                DrawTexture (background.sprite, i, j, WHITE);
 }
 
-
 void CalcCollisions (void)
 {
      char buffer[101];
@@ -466,84 +559,4 @@ void LogCoords (void)
      printf ("Player: (%d %d)\n", player.x, player.y);
      */
      return;
-}
-
-int main (int argc, char **argv)
-{
-     Init();
-     if (rc != SQLITE_OK)
-     {
-          fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
-          sqlite3_close(db);
-          return 1;
-     }
-     // command-line args
-     for (int i = 1; i < argc && argc > 1; i++)
-     {
-          if (strcmp (argv[i], "mutemusic") == 0)
-          {
-               printf ("arg[%d] == %s\n", argc, argv[i]);
-               PauseMusicStream(music[0]);
-               game.mutemusic = 1;
-          }
-          if (strcmp (argv[i], "cleardb") == 0)
-          {
-               printf ("arg[%d] == %s\n", argc, argv[i]);
-               // truncate the res/db/stats.db file
-               game.cleardb = 1;
-          }
-     }
-     LogCoords();
-     while (!WindowShouldClose())
-     {
-          w.x = GetScreenWidth();
-          w.y = GetScreenHeight();
-          if (!game.mutemusic)
-               UpdateMusicStream(music[0]);
-          PlayerMovement();
-          EnemyMovement();
-          CalcCollisions();
-          BeginDrawing();
-               ClearBackground(BLACK);
-               DrawBackground();
-               DrawEntities();
-               DrawHUD();
-          EndDrawing();
-          if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
-          {
-               GenerateEntities();
-               DrawEntities();
-               DrawHUD();
-          }
-          if (IsKeyPressed (KEY_Q) || game.close)
-               break;
-          if (IsKeyPressed (KEY_F))
-               printf ("(%.3f %.3f)\n", player[0].x, player[0].y);
-     }
-     UnloadTexture (player[0].sprite);
-     UnloadTexture (background.sprite);
-     for (int i = 1; i < 100; i++)
-          if (grass[i].num || apple[i].num || bomb[i].num || tree[i].num)
-          {
-               UnloadTexture (grass[i].sprite);
-               UnloadTexture (apple[i].sprite);
-               UnloadTexture (bomb[i].sprite);
-               UnloadTexture (tree[i].sprite);
-          }
-     StopMusicStream(music[0]);
-     CloseAudioDevice();
-     CloseWindow();
-     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
-     strcpy (sql, "SELECT Playername, RNG, Name FROM Obstacles ORDER BY RNG DESC LIMIT 3");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
-     if (rc != SQLITE_OK)
-     {
-          fprintf (stderr, "Failed to select data\n");
-          fprintf (stderr, "SQL Error: %s\n", err_msg);
-          sqlite3_close(db);
-          return 1;
-     }
-     sqlite3_close(db);
-     return 0;
 }
