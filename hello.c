@@ -1,31 +1,58 @@
-/*
-     sql = "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER);" //Hard BOOLEAN)"
-           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG REAL PRIMARY KEY);";
-*/
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
 #include <raylib.h>
+#include <string.h>
+#include <math.h>
 
-typedef struct 
+typedef struct
 {
      int x, y;
 } Window;
 
-typedef struct
-{
-     Texture2D sprite;
-     short x, y, speed, num, score;
-} Entity;
-
 Window w = {
-     .x = 800,
-     .y = 600
+     .x = 1280,
+     .y = 720,
 };
 
-Entity a[50], b, cc[1], dd[2];
-int health = 10;
+Window CenterText (const char *s, int size);
+
+int main ()
+{
+     SetConfigFlags (FLAG_WINDOW_RESIZABLE);
+     InitWindow (w.x, w.y, "Menu");
+     SetTargetFPS(60);
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          char s[] = "Pixper";
+          int size = w.x/10, rectsize;
+          Window mid = CenterText (s, size);
+          BeginDrawing();
+               ClearBackground (BLACK);
+               DrawText (s, mid.x, mid.y/2, size, GREEN);
+               size = w.x/30;
+               strcpy (s, "Play");
+               Color c = {
+                    .r = 51,
+                    .g = 51,
+                    .b = 51,
+                    .a = 230,
+               };
+               rectsize = w.x/2 - MeasureText (s, size);
+               DrawRectangle (rectsize, w.y/2-size, 200, 100, c);
+               DrawText (s, w.x/2 - MeasureText (s, size)+strlen(s)*10, w.y/2-size+100/4, size, YELLOW);
+               strcpy (s, "Options");
+               DrawRectangle (rectsize, w.y/2-size+120, 200, 100, c);
+               DrawText (s, w.x/2 - MeasureText (s, size)+strlen(s)*10, w.y/2-size+100/4+120, size, YELLOW);
+               if (IsKeyPressed(KEY_Q))
+                    break;
+               //if (IsKeyPressed(KEY_F))
+                    //printf ("\nx: %d ~ %d\ny: %d ~ %d", GetMouseX(), play.x/4, GetMouseY(), play.y/4);
+          EndDrawing();
+     }
+     CloseWindow();
+     return 0;
+}
 
 Window CenterText (const char *s, int size)
 {
@@ -33,35 +60,4 @@ Window CenterText (const char *s, int size)
           .x = w.x/2 - MeasureText (s, size)/2,
           .y = w.y/2 - size/2,
      };
-}
-
-int main (void)
-{
-     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-     InitWindow(w.x, w.y, "Pixper");
-     SetTargetFPS(60);
-     while (!WindowShouldClose())
-     {
-          w.x = GetScreenWidth ();
-          w.y = GetScreenHeight ();
-          char s[] = "Hello World\0";
-          int size = w.x / 20;
-          Window mid = CenterText (s, size);
-          
-          BeginDrawing();
-               ClearBackground(BLACK);
-               //if (IsWindowMaximized())
-               if (IsWindowResized ())
-                    DrawText(s, mid.x, mid.y, size, BLUE);
-               if (IsWindowResized() && IsWindowMaximized())
-               {
-                    printf ("(%d %d)\n", mid.x, mid.y);
-                    DrawText(strchr(s, ' ')+1, mid.x, mid.y, size, BLUE);
-               }
-          EndDrawing();
-          if (IsKeyPressed(KEY_Q))
-               break;
-     }
-     CloseWindow();
-     return 0;
 }
