@@ -8,11 +8,19 @@
 
 #define PLATFORM_DESKTOP
 #define E_SZ 100
+#define PLAY 1
+#define OPTIONS 2
+#define QUIT 3
 
 typedef struct
 {
-     int x, y;
-} Window;
+     Vector2 a, b;
+} VectorPair;
+
+Vector2 w = {
+     .x = 1280,
+     .y = 720,
+};
 
 typedef struct
 {
@@ -61,36 +69,33 @@ typedef struct
      } bomb;
 } Collision;
 
-Window w = {
-     .x = 1280,
-     .y = 720,
-};
-
 Entity player[2], background, apple[E_SZ], grass[E_SZ], tree[E_SZ], bomb[E_SZ];
 Sound sound[4];
 Music music[4];
 Game game;
 Difficulty diff;
 Collision col;
+VectorPair buttons[20];
 
 sqlite3 *db;
 char *err_msg, sql[500];
 int rc;
 
 // all functions used
+// FIXME: refactoring
 int callback(void *NotUsed, int argc, char **argv, char **azColName);
 void Commandline (int argc, char **argv);
 bool IsCollision (Entity *a, Entity *b, float c);
 void SetDifficulty (bool difficulty);
 void GenerateEntities (void);
-void Init (void);
+Vector2 CenterText (const char *s, int size, Vector2 pos);
+VectorPair DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
+void DrawBackground (float alpha);
+void InitMenu (void);
+void DrawMenu (void);
+void InitGame (void);
 void PlayerMovement (void);
 void EnemyMovement (void);
-Window CenterText (const char *s, int size);
-void DrawEntities (void);
-void DrawBackground (void);
-void CalcCollisions (void);
-void DrawHUD (void);
 
 int main (int argc, char **argv)
 {
@@ -101,7 +106,7 @@ int main (int argc, char **argv)
           return 1;
      }
      Commandline(argc, argv);
-     Init();
+     InitGame();
      while (!WindowShouldClose())
      {
           w.x = GetScreenWidth();
@@ -332,7 +337,7 @@ void GenerateEntities (void)
      }
 }
 
-void Init (void)
+void InitGame (void)
 {
      SetConfigFlags(FLAG_WINDOW_RESIZABLE);
      InitWindow(w.x, w.y, "Pixper");
