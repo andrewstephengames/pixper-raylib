@@ -79,6 +79,7 @@ int rc;
 
 // all functions used
 int callback(void *NotUsed, int argc, char **argv, char **azColName);
+void Commandline (int argc, char **argv);
 bool IsCollision (Entity *a, Entity *b, float c);
 void SetDifficulty (bool difficulty);
 void GenerateEntities (void);
@@ -89,34 +90,18 @@ Window CenterText (const char *s, int size);
 void DrawEntities (void);
 void DrawBackground (void);
 void CalcCollisions (void);
-void LogCoords (void);
+void DrawHUD (void);
 
 int main (int argc, char **argv)
 {
-     Init();
      if (rc != SQLITE_OK)
      {
           fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
           sqlite3_close(db);
           return 1;
      }
-     // command-line args
-     for (int i = 1; i < argc && argc > 1; i++)
-     {
-          if (strcmp (argv[i], "mutemusic") == 0)
-          {
-               printf ("arg[%d] == %s\n", argc, argv[i]);
-               PauseMusicStream(music[0]);
-               game.mutemusic = 1;
-          }
-          if (strcmp (argv[i], "cleardb") == 0)
-          {
-               printf ("arg[%d] == %s\n", argc, argv[i]);
-               // truncate the res/db/stats.db file
-               game.cleardb = 1;
-          }
-     }
-     LogCoords();
+     Commandline(argc, argv);
+     Init();
      while (!WindowShouldClose())
      {
           w.x = GetScreenWidth();
@@ -178,6 +163,28 @@ int callback(void *NotUsed, int argc, char **argv, char **azColName)
           printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
      printf("\n");
      return 0;
+}
+
+void Commandline (int argc, char **argv)
+{
+     // command-line args
+     for (int i = 1; i < argc && argc > 1; i++)
+     {
+          if (strcmp (argv[i], "mutemusic") == 0)
+          {
+               printf ("arg[%d] == %s\n", argc, argv[i]);
+               PauseMusicStream(music[0]);
+               game.mutemusic = 1;
+          }
+          if (strcmp (argv[i], "cleardb") == 0)
+          {
+               printf ("arg[%d] == %s\n", argc, argv[i]);
+               // truncate the res/db/stats.db file
+               FILE *f = fopen ("res/db/stats.db", "w");
+               fclose(f);
+               game.cleardb = 1;
+          }
+     }
 }
 
 bool IsCollision (Entity *a, Entity *b, float c)
@@ -546,17 +553,4 @@ void DrawHUD (void)
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
      }
-}
-
-//TODO: Add database to log obstacles
-void LogCoords (void)
-{
-     /*
-     printf ("Apple: (%d %d)\n", apple.x, apple.y);
-     printf ("Grass: (%d %d)\n", grass.x, grass.y);
-     printf ("Tree: (%d %d)\n", tree.x, tree.y);
-     printf ("Bomb: (%d %d)\n", bomb.x, bomb.y);
-     printf ("Player: (%d %d)\n", player.x, player.y);
-     */
-     return;
 }
