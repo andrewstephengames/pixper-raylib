@@ -1,8 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 #include <raylib.h>
 #include <raymath.h>
-#include <string.h>
-#include <math.h>
 
 #define PLAY 1
 #define OPTIONS 2
@@ -17,26 +16,49 @@ Vector2 w = {
      .x = 1280,
      .y = 720,
 };
-VectorPair buttons[20];
 
+typedef struct
+{
+     bool close;
+} Game;
+
+VectorPair buttons[20];
+Game game;
+
+VectorPair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
-VectorPair DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
 void DrawBackground (float alpha);
 void InitMenu (void);
-void DrawMenu (void);
 
-int main ()
+int main (void)
 {
-     InitMenu();
+     SetConfigFlags (FLAG_WINDOW_RESIZABLE);
+     InitWindow (w.x, w.y, "Menu");
+     SetTargetFPS(60);
+     SetTraceLogLevel(LOG_ERROR);
+     while (!WindowShouldClose() && !game.close)
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          BeginDrawing();
+               ClearBackground (BLACK);
+               DrawBackground (150);
+               InitMenu();
+          EndDrawing();
+               if (IsKeyPressed(KEY_Q))
+                    break;
+     }
+     CloseWindow();
      return 0;
 }
 
 Vector2 CenterText (const char *s, int size, Vector2 pos)
 {
-     return (Vector2) {
+     Vector2 newpos = {
           .x = pos.x/2 - MeasureText (s, size)/2,
           .y = pos.y/2 - size/2,
      };
+     return newpos;
 }
 
 
@@ -79,7 +101,6 @@ void DrawBackground (float alpha)
      DrawRectangle (0, 0, w.x, w.y, c);
 }
 
-// TODO: highlighting / outlining of menu selection
 void InitMenu (void)
 {
      int size = w.x/10;
@@ -107,25 +128,5 @@ void InitMenu (void)
      if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
           input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               printf ("Quit\n");
-}
-
-void DrawMenu (void)
-{
-     SetConfigFlags (FLAG_WINDOW_RESIZABLE);
-     InitWindow (w.x, w.y, "Menu");
-     SetTargetFPS(60);
-     SetTraceLogLevel(LOG_ERROR);
-     while (!WindowShouldClose())
-     {
-          w.x = GetRenderWidth();
-          w.y = GetRenderHeight();
-          BeginDrawing();
-               ClearBackground (BLACK);
-               DrawBackground (150);
-          EndDrawing();
-               if (IsKeyPressed(KEY_Q))
-                    break;
-     }
-     CloseWindow();
+               game.close = 1;
 }
