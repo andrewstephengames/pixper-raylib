@@ -1,3 +1,5 @@
+//FIXME: multiple windows spawning
+//TODO: add feature to buy an apple reveal using the score acquired
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> //for strcat, strcpy, strlen and strcmp
@@ -11,7 +13,8 @@
 #define E_SZ 100
 #define PLAY 1
 #define OPTIONS 2
-#define QUIT 3
+#define STATS 3
+#define QUIT 4
 
 typedef struct
 {
@@ -76,7 +79,7 @@ Music music[4];
 Game game;
 Difficulty diff;
 Collision col;
-VectorPair buttons[20];
+VectorPair buttons[10];
 
 sqlite3 *db;
 char *err_msg, sql[500];
@@ -291,14 +294,21 @@ void DrawMenu (int argc, char **argv)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                Gameplay(argc, argv);
      strcpy (s, "Options");
-     buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.08f, bg, fg);
+     buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
      if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
           input.y >= buttons[OPTIONS].a.y && input.y <= buttons[OPTIONS].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                //TODO: options menu
                printf ("Options\n");
+     strcpy (s, "Stats");
+     buttons[STATS] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+     if (input.x >= buttons[STATS].a.x && input.x <= buttons[STATS].b.x &&
+          input.y >= buttons[STATS].a.y && input.y <= buttons[STATS].b.y)
+          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+               //TODO: stats menu
+               printf ("Stats\n");
      strcpy (s, "Quit");
-     buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.16f, bg, fg);
+     buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
      if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
           input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
@@ -308,7 +318,7 @@ void DrawMenu (int argc, char **argv)
 void InitMenu (int argc, char **argv)
 {
      SetConfigFlags (FLAG_WINDOW_RESIZABLE);
-     InitWindow (w.x, w.y, "Pixper");
+     InitWindow (w.x, w.y, "Pixper - Menu");
      SetTargetFPS(60);
      SetTraceLogLevel(LOG_ERROR);
      while (!WindowShouldClose() && !game.close)
@@ -530,7 +540,7 @@ void DrawHUD (int argc, char **argv)
           int size = 50;
           Vector2 mid = CenterText (s, size, w);
           DrawText (s, mid.x, mid.y, size, GRAY);
-          game.close = 1;
+          //game.close = 1;
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[1].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
@@ -543,7 +553,7 @@ void DrawHUD (int argc, char **argv)
           int size = 50;
           Vector2 mid = CenterText (s, size, w);
           DrawText (s, mid.x, mid.y, size, YELLOW);
-          game.close = 1;
+          //game.close = 1;
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[0].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
