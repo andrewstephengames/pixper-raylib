@@ -19,7 +19,8 @@ Vector2 w = {
 
 typedef struct
 {
-     bool close;
+     bool close, won;
+     int score;
 } Game;
 
 VectorPair buttons[20];
@@ -103,28 +104,54 @@ void DrawBackground (float alpha)
 
 void InitMenu (void)
 {
-     int size = w.x/10;
+     int size = w.x/20;
      char s[30];
-     strcpy (s, "Pixper");
-     Vector2 mid = CenterText (s, size, w);
-     DrawText (s, mid.x, mid.y/2, size, YELLOW);
+     game.won = 1;
+     game.score = 0xFF;
+     if (game.won)
+     {
+          strcpy (s, "You Won!");
+          Vector2 mid = CenterText (s, size, w);
+          DrawText (s, mid.x, mid.y/2, size, YELLOW);
+          sprintf (s, "Score: %d", game.score);
+          size = w.x/30;
+          mid = CenterText (s, size, w);
+          DrawText (s, mid.x, (mid.y/2)*1.5f, size, YELLOW);
+     }
+     else
+     {
+          strcpy (s, "You Lost!");
+          Vector2 mid = CenterText (s, size, w);
+          DrawText (s, mid.x, mid.y/2, size, RED);
+          size = w.x/30;
+          if (game.score == 0)
+               strcpy (s, "The Enemy stole no apples!");
+          if (game.score == 1)
+               strcpy (s, "The Enemy stole one apple!");
+          if (game.score >= 2)
+               sprintf (s, "The Enemy stole %d apples!", game.score);
+          mid = CenterText (s, size, w);
+          DrawText (s, mid.x, (mid.y/2)*1.5f, size, RED);
+     }
+     Vector2 half = {
+          w.x/2,
+          w.y,
+     };
+     Vector2 most = {
+          w.x + w.x/2,
+          w.y,
+     };
      size = w.x/20;
      Vector2 input = GetMousePosition();
      Color fg = YELLOW, bg = { 40, 40, 40, 120 };
      strcpy (s, "Play");
-     buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
+     buttons[PLAY] = DrawTextButton (s, size, half, w.x*0.10f, bg, fg);
      if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
           input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                printf ("Play\n");
-     strcpy (s, "Options");
-     buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.08f, bg, fg);
-     if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
-          input.y >= buttons[OPTIONS].a.y && input.y <= buttons[OPTIONS].b.y)
-          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               printf ("Options\n");
      strcpy (s, "Quit");
-     buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.16f, bg, fg);
+     buttons[QUIT] = DrawTextButton (s, size, most, w.x*0.10f, bg, fg);
      if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
           input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
