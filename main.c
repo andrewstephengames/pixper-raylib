@@ -37,7 +37,7 @@ typedef struct
 
 typedef struct
 {
-     bool close, mutemusic, mutesound, help, version, cleardb, difficulty;
+     bool close, mutemusic, mutesound, difficulty;
      int score, health, delay;
 } Game;
 
@@ -106,8 +106,50 @@ void Gameplay (int argc, char **argv);
 
 int main (int argc, char **argv)
 {
+     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+     InitWindow(w.x, w.y, "Pixper");
+     InitAudioDevice();
+     SetTargetFPS(60);
+     SetTraceLogLevel(LOG_ERROR);
+     SetRandomSeed(clock());
+     rc = sqlite3_open ("res/db/stats.db", &db);
+     strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER, Difficulty BOOLEAN);"
+           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG INTEGER PRIMARY KEY, Name TEXT);");
+     
+     rc = sqlite3_exec(db, sql, 0, 0, &err_msg); //update db
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
+          sqlite3_close(db);
+          return 1;
+     }
+     Commandline(argc, argv);
      InitMenu(argc, argv);
+     UnloadTexture (player[0].sprite);
+     UnloadTexture (background.sprite);
+     for (int i = 1; i < 100; i++)
+          if (grass[i].num || apple[i].num || bomb[i].num || tree[i].num)
+          {
+               UnloadTexture (grass[i].sprite);
+               UnloadTexture (apple[i].sprite);
+               UnloadTexture (bomb[i].sprite);
+               UnloadTexture (tree[i].sprite);
+          }
+     StopMusicStream(music[0]);
+     CloseAudioDevice();
      CloseWindow();
+     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     strcpy (sql, "SELECT Playername, RNG, Name FROM Obstacles ORDER BY RNG DESC LIMIT 3");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Failed to select data\n");
+          fprintf (stderr, "SQL Error: %s\n", err_msg);
+          sqlite3_close(db);
+          return 1;
+     }
+     sqlite3_close(db);
      return 0;
 }
 
@@ -137,7 +179,6 @@ void Commandline (int argc, char **argv)
                // truncate the res/db/stats.db file
                FILE *f = fopen ("res/db/stats.db", "w");
                fclose(f);
-               game.cleardb = 1;
           }
      }
 }
@@ -292,7 +333,7 @@ void DrawMenu (int argc, char **argv)
      if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
           input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               Gameplay(argc, argv);
+               Gameplay (argc, argv);
      strcpy (s, "Options");
      buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
      if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
@@ -317,11 +358,7 @@ void DrawMenu (int argc, char **argv)
 
 void InitMenu (int argc, char **argv)
 {
-     SetConfigFlags (FLAG_WINDOW_RESIZABLE);
-     InitWindow (w.x, w.y, "Pixper - Menu");
-     SetTargetFPS(60);
-     SetTraceLogLevel(LOG_ERROR);
-     while (!WindowShouldClose() && !game.close)
+     while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
           w.y = GetRenderHeight();
@@ -331,6 +368,8 @@ void InitMenu (int argc, char **argv)
                DrawMenu(argc, argv);
           EndDrawing();
                if (IsKeyPressed(KEY_Q))
+                    game.close = 1;
+               if (game.close)
                     break;
      }
 }
@@ -540,12 +579,11 @@ void DrawHUD (int argc, char **argv)
           int size = 50;
           Vector2 mid = CenterText (s, size, w);
           DrawText (s, mid.x, mid.y, size, GRAY);
-          //game.close = 1;
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[1].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-          //TODO: make end game menu
           InitMenu(argc, argv);
+          //TODO: make end game menu
      }
      if (game.score == apple[0].num)
      {
@@ -553,29 +591,16 @@ void DrawHUD (int argc, char **argv)
           int size = 50;
           Vector2 mid = CenterText (s, size, w);
           DrawText (s, mid.x, mid.y, size, YELLOW);
-          //game.close = 1;
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[0].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-          //TODO: make end game menu
           InitMenu(argc, argv);
+          //TODO: make end game menu
      }
 }
 
 void Gameplay (int argc, char **argv)
 {
-     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-     InitWindow(w.x, w.y, "Pixper");
-     InitAudioDevice();
-     SetTargetFPS(60);
-     SetTraceLogLevel(LOG_ERROR);
-     SetRandomSeed(clock());
-     rc = sqlite3_open ("res/db/stats.db", &db);
-     strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER, Difficulty BOOLEAN);"
-           "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG INTEGER PRIMARY KEY, Name TEXT);");
-     
-     rc = sqlite3_exec(db, sql, 0, 0, &err_msg); //update db
-
      game.health = 10;
      game.delay = 0x1000*GetFrameTime();
      game.difficulty = 0;
@@ -601,14 +626,7 @@ void Gameplay (int argc, char **argv)
      SetMusicVolume (music[0], 0.25f);
 
      GenerateEntities();
-     if (rc != SQLITE_OK)
-     {
-          fprintf (stderr, "Cannot open the database: %s\n", sqlite3_errmsg(db));
-          sqlite3_close(db);
-          return;
-     }
-     Commandline(argc, argv);
-     while (!WindowShouldClose())
+     while (!WindowShouldClose() && !game.close)
      {
           w.x = GetScreenWidth();
           w.y = GetScreenHeight();
@@ -629,35 +647,9 @@ void Gameplay (int argc, char **argv)
                DrawEntities();
                DrawHUD(argc, argv);
           }
-          if (IsKeyPressed (KEY_Q) || game.close)
+          if (IsKeyPressed (KEY_Q))
                break;
           if (IsKeyPressed (KEY_F))
                printf ("(%.3f %.3f)\n", player[0].x, player[0].y);
      }
-     UnloadTexture (player[0].sprite);
-     UnloadTexture (background.sprite);
-     for (int i = 1; i < 100; i++)
-          if (grass[i].num || apple[i].num || bomb[i].num || tree[i].num)
-          {
-               UnloadTexture (grass[i].sprite);
-               UnloadTexture (apple[i].sprite);
-               UnloadTexture (bomb[i].sprite);
-               UnloadTexture (tree[i].sprite);
-          }
-     StopMusicStream(music[0]);
-     CloseAudioDevice();
-     CloseWindow();
-     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
-     strcpy (sql, "SELECT Playername, RNG, Name FROM Obstacles ORDER BY RNG DESC LIMIT 3");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
-     if (rc != SQLITE_OK)
-     {
-          fprintf (stderr, "Failed to select data\n");
-          fprintf (stderr, "SQL Error: %s\n", err_msg);
-          sqlite3_close(db);
-          return;
-     }
-     sqlite3_close(db);
-     InitMenu(argc, argv);
 }
