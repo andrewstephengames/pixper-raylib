@@ -1,4 +1,3 @@
-//FIXME: multiple windows spawning
 //TODO: add feature to buy an apple reveal using the score acquired
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +18,7 @@
 typedef struct
 {
      Vector2 a, b;
-} VectorPair;
+} Vector2Pair;
 
 Vector2 w = {
      .x = 1280,
@@ -37,7 +36,7 @@ typedef struct
 
 typedef struct
 {
-     bool close, mutemusic, mutesound, difficulty;
+     bool close, mutemusic, mutesound, difficulty, won;
      int score, health, delay;
 } Game;
 
@@ -79,7 +78,7 @@ Music music[4];
 Game game;
 Difficulty diff;
 Collision col;
-VectorPair buttons[10];
+Vector2Pair buttons[10];
 
 sqlite3 *db;
 char *err_msg, sql[500];
@@ -92,17 +91,18 @@ void Commandline (int argc, char **argv);
 bool IsCollision (Entity *a, Entity *b, float c);
 void SetDifficulty (bool difficulty);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
-VectorPair DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
-void DrawBackground (float alpha);
-void DrawMenu (int argc, char **argv);
-void InitMenu (int argc, char **argv);
+Vector2Pair DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
+void DrawBackground (float alpha, bool usesprite);
+void DrawMenu (void);
+void InitMenu (void);
+void EndMenu (void);
 void PlayerMovement (void);
 void EnemyMovement (void);
 void GenerateEntities (void);
 void DrawEntities (void);
 void CalcCollisions (void);
-void DrawHUD (int argc, char **argv);
-void Gameplay (int argc, char **argv);
+void DrawHUD (void);
+void Gameplay (void);
 
 int main (int argc, char **argv)
 {
@@ -124,7 +124,7 @@ int main (int argc, char **argv)
           return 1;
      }
      Commandline(argc, argv);
-     InitMenu(argc, argv);
+     InitMenu();
      UnloadTexture (player[0].sprite);
      UnloadTexture (background.sprite);
      for (int i = 1; i < 100; i++)
@@ -279,33 +279,22 @@ Vector2 CenterText (const char *s, int size, Vector2 pos)
      return newpos;
 }
 
-VectorPair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
+Vector2Pair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
 {
      Vector2 center = CenterText (s, textsize, pos);
-     Vector2 rect = {
-          .x = pos.x/10,
-          .y = pos.y/10,
-     };
-     size_t num = strlen(s);
-     if (num <= 4)
-          rect.x += MeasureText ("a", textsize);
-     else while (num > strlen(s)/2)
-          {
-               rect.x += MeasureText ("a", textsize);
-               --num;
-          }
-     DrawRectangle (center.x, center.y+offset, rect.x, rect.y, bg);
-     center.x += MeasureText ("a", textsize)/4;
+     Font font = GetFontDefault();
+     Vector2 rectsize = MeasureTextEx (font, s, textsize, w.x/200);
+     DrawRectangle (center.x, center.y+offset, rectsize.x, rectsize.y, bg);
      DrawText (s, center.x, center.y+offset, textsize, fg);
      center.y += offset;
-     VectorPair v = {
-          .a = center,
-          .b = Vector2Add (center, rect),
+     Vector2Pair v = {
+          center,
+          Vector2Add(center, rectsize),
      };
      return v;
 }
 
-void DrawBackground (float alpha)
+void DrawBackground (float alpha, bool usesprite)
 {
      Texture2D sprite = LoadTexture ("res/images/grass.png");
      Color c = WHITE;
@@ -314,11 +303,12 @@ void DrawBackground (float alpha)
           .width = w.x,
           .height = w.y,
      };
-     SetShapesTexture (sprite, rect);
+     if (usesprite)
+          SetShapesTexture (sprite, rect);
      DrawRectangle (0, 0, w.x, w.y, c);
 }
 
-void DrawMenu (int argc, char **argv)
+void DrawMenu (void)
 {
      int size = w.x/10;
      char s[30];
@@ -333,7 +323,7 @@ void DrawMenu (int argc, char **argv)
      if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
           input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               Gameplay (argc, argv);
+               Gameplay ();
      strcpy (s, "Options");
      buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
      if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
@@ -356,7 +346,7 @@ void DrawMenu (int argc, char **argv)
                game.close = 1;
 }
 
-void InitMenu (int argc, char **argv)
+void InitMenu (void)
 {
      while (!WindowShouldClose())
      {
@@ -364,8 +354,75 @@ void InitMenu (int argc, char **argv)
           w.y = GetRenderHeight();
           BeginDrawing();
                ClearBackground (BLACK);
-               DrawBackground (150);
-               DrawMenu(argc, argv);
+               DrawBackground (150, 1);
+               DrawMenu();
+          EndDrawing();
+               if (IsKeyPressed(KEY_Q))
+                    game.close = 1;
+               if (game.close)
+                    break;
+     }
+}
+
+void EndMenu (void)
+{
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          int size = w.x/20;
+          char s[30];
+          Vector2 half = {
+               w.x/2,
+               w.y,
+          };
+          Vector2 most = {
+               w.x + w.x/2,
+               w.y,
+          };
+          Vector2 input = GetMousePosition();
+          Color fg = YELLOW, bg = { 40, 40, 40, 120 };
+          BeginDrawing();
+               //ClearBackground (BLACK);
+               //DrawBackground (150, 0);
+               if (game.won)
+               {
+                    strcpy (s, "You Won!");
+                    Vector2 mid = CenterText (s, size, w);
+                    DrawText (s, mid.x, mid.y/2, size, YELLOW);
+                    sprintf (s, "Score: %d", game.score);
+                    size = w.x/30;
+                    mid = CenterText (s, size, w);
+                    DrawText (s, mid.x, (mid.y/2)*1.5f, size, YELLOW);
+               }
+               else
+               {
+                    strcpy (s, "You Lost!");
+                    Vector2 mid = CenterText (s, size, w);
+                    DrawText (s, mid.x, mid.y/2, size, RED);
+                    size = w.x/30;
+                    if (game.score == 0)
+                         strcpy (s, "The Enemy stole no apples!");
+                    if (game.score == 1)
+                         strcpy (s, "The Enemy stole one apple!");
+                    if (game.score >= 2)
+                         sprintf (s, "The Enemy stole %d apples!", game.score);
+                    mid = CenterText (s, size, w);
+                    DrawText (s, mid.x, (mid.y/2)*1.5f, size, RED);
+               }
+               strcpy (s, "Play Again");
+               buttons[PLAY] = DrawTextButton (s, size, half, w.x*0.10f, bg, fg);
+               if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
+                    input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         Gameplay();
+               strcpy (s, "Quit to Menu");
+               buttons[QUIT] = DrawTextButton (s, size, most, w.x*0.10f, bg, fg);
+               if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
+                    input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         InitMenu();
+               
           EndDrawing();
                if (IsKeyPressed(KEY_Q))
                     game.close = 1;
@@ -565,9 +622,9 @@ void CalcCollisions (void)
      }
 }
 
-void DrawHUD (int argc, char **argv)
+void DrawHUD (void)
 {
-     char buffer[101], s[30];
+     char buffer[101]; 
      snprintf (buffer, 30, "%s: %d", "Score", game.score);
      DrawText (buffer, 10, 10, 30, DARKBLUE);
      snprintf (buffer, 30, "%s: %d", "Health", game.health);
@@ -575,31 +632,23 @@ void DrawHUD (int argc, char **argv)
      if (game.health <= 0)
      {
           game.health = 0;
-          strcpy (s, "You Died!");
-          int size = 50;
-          Vector2 mid = CenterText (s, size, w);
-          DrawText (s, mid.x, mid.y, size, GRAY);
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[1].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-          InitMenu(argc, argv);
-          //TODO: make end game menu
+          game.won = 0;
+          EndMenu();
      }
      if (game.score == apple[0].num)
      {
-          strcpy (s, "You won!");
-          int size = 50;
-          Vector2 mid = CenterText (s, size, w);
-          DrawText (s, mid.x, mid.y, size, YELLOW);
           sprintf (buffer, "INSERT OR REPLACE INTO Players VALUES ('%s', '%d', '%d');", player[0].name, game.score, game.difficulty);
           strcpy (sql, buffer);
           rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-          InitMenu(argc, argv);
-          //TODO: make end game menu
+          game.won = 1;
+          EndMenu();
      }
 }
 
-void Gameplay (int argc, char **argv)
+void Gameplay (void)
 {
      game.health = 10;
      game.delay = 0x1000*GetFrameTime();
@@ -637,15 +686,15 @@ void Gameplay (int argc, char **argv)
           CalcCollisions();
           BeginDrawing();
                ClearBackground(BLACK);
-               DrawBackground(255);
+               DrawBackground(255, 1);
                DrawEntities();
-               DrawHUD(argc, argv);
+               DrawHUD();
           EndDrawing();
           if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
           {
                GenerateEntities();
                DrawEntities();
-               DrawHUD(argc, argv);
+               DrawHUD();
           }
           if (IsKeyPressed (KEY_Q))
                break;
