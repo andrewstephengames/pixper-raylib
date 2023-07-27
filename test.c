@@ -3,14 +3,16 @@
 #include <raylib.h>
 #include <raymath.h>
 
-#define PLAY 1
-#define OPTIONS 2
-#define QUIT 3
+#define NAME 1
+#define PLAY 2
+#define OPTIONS 3
+#define STATS 4
+#define QUIT 5
 
 typedef struct
 {
      Vector2 a, b;
-} VectorPair;
+} Vector2Pair;
 
 Vector2 w = {
      .x = 1280,
@@ -23,13 +25,16 @@ typedef struct
      int score;
 } Game;
 
-VectorPair buttons[20];
+Vector2Pair buttons[20];
 Game game;
 
-VectorPair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg);
+Vector2Pair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
 void DrawBackground (float alpha);
+Rectangle AddRect (Rectangle a, Rectangle b);
+void DrawMenu (void);
 void InitMenu (void);
+void EndMenu (void);
 
 int main (void)
 {
@@ -44,10 +49,16 @@ int main (void)
           BeginDrawing();
                ClearBackground (BLACK);
                DrawBackground (150);
-               InitMenu();
+               //InitMenu();
+               EndMenu();
           EndDrawing();
-               if (IsKeyPressed(KEY_Q))
-                    break;
+          if (IsKeyPressed(KEY_Q))
+               break;
+          if (IsKeyPressed(KEY_F))
+          {
+               Vector2 mouse = GetMousePosition();
+               printf ("Mouse: (%.f %.f)\n", mouse.x, mouse.y);
+          }
      }
      CloseWindow();
      return 0;
@@ -62,29 +73,28 @@ Vector2 CenterText (const char *s, int size, Vector2 pos)
      return newpos;
 }
 
+Rectangle AddRect (Rectangle a, Rectangle b)
+{
+     Rectangle rect = {
+          a.x + b.x,
+          a.y + b.y,
+          a.width + b.width,
+          a.height + b.height,
+     };
+     return rect;
+}
 
-VectorPair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
+Vector2Pair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
 {
      Vector2 center = CenterText (s, textsize, pos);
-     Vector2 rect = {
-          .x = pos.x/10,
-          .y = pos.y/10,
-     };
-     size_t num = strlen(s);
-     if (num <= 4)
-          rect.x += MeasureText ("a", textsize);
-     else while (num > strlen(s)/2)
-          {
-               rect.x += MeasureText ("a", textsize);
-               --num;
-          }
-     DrawRectangle (center.x, center.y+offset, rect.x, rect.y, bg);
-     center.x += MeasureText ("a", textsize)/4;
+     Font font = GetFontDefault();
+     Vector2 rectsize = MeasureTextEx (font, s, textsize, w.x/200);
+     DrawRectangle (center.x, center.y+offset, rectsize.x, rectsize.y, bg);
      DrawText (s, center.x, center.y+offset, textsize, fg);
      center.y += offset;
-     VectorPair v = {
-          .a = center,
-          .b = Vector2Add (center, rect),
+     Vector2Pair v = {
+          center,
+          Vector2Add(center, rectsize),
      };
      return v;
 }
@@ -102,7 +112,63 @@ void DrawBackground (float alpha)
      DrawRectangle (0, 0, w.x, w.y, c);
 }
 
+void DrawMenu (void)
+{
+     int size = w.x/10;
+     char s[30];
+     strcpy (s, "Pixper");
+     Vector2 mid = CenterText (s, size, w);
+     DrawText (s, mid.x, mid.y/2, size, YELLOW);
+     size = w.x/20;
+     Vector2 input = GetMousePosition();
+     Color fg = YELLOW, bg = { 40, 40, 40, 120 };
+     strcpy (s, "Play");
+     buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
+     if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
+          input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
+          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+               printf ("Play\n");
+     strcpy (s, "Options");
+     buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
+     if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
+          input.y >= buttons[OPTIONS].a.y && input.y <= buttons[OPTIONS].b.y)
+          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+               //TODO: options menu
+               printf ("Options\n");
+     strcpy (s, "Stats");
+     buttons[STATS] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+     if (input.x >= buttons[STATS].a.x && input.x <= buttons[STATS].b.x &&
+          input.y >= buttons[STATS].a.y && input.y <= buttons[STATS].b.y)
+          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+               //TODO: stats menu
+               printf ("Stats\n");
+     strcpy (s, "Quit");
+     buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
+     if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
+          input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
+          if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+               game.close = 1;
+}
+
 void InitMenu (void)
+{
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          BeginDrawing();
+               ClearBackground (BLACK);
+               DrawBackground (150);
+               DrawMenu();
+          EndDrawing();
+               if (IsKeyPressed(KEY_Q))
+                    game.close = 1;
+               if (game.close)
+                    break;
+     }
+}
+
+void EndMenu (void)
 {
      int size = w.x/20;
      char s[30];
@@ -144,13 +210,13 @@ void InitMenu (void)
      size = w.x/20;
      Vector2 input = GetMousePosition();
      Color fg = YELLOW, bg = { 40, 40, 40, 120 };
-     strcpy (s, "Play");
+     strcpy (s, "Play Again");
      buttons[PLAY] = DrawTextButton (s, size, half, w.x*0.10f, bg, fg);
      if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
           input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                printf ("Play\n");
-     strcpy (s, "Quit");
+     strcpy (s, "Quit to Menu");
      buttons[QUIT] = DrawTextButton (s, size, most, w.x*0.10f, bg, fg);
      if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
           input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
