@@ -16,7 +16,8 @@
 #define QUIT 4
 #define SFX 5
 #define MUS 6
-#define BACK 7
+#define DIFF 7
+#define BACK 8
 
 typedef struct
 {
@@ -39,7 +40,7 @@ typedef struct
 
 typedef struct
 {
-     bool close, mutemusic, mutesound, difficulty, won;
+     bool close, mutemusic, mutesound, difficulty, won, start;
      int score, health, delay, pausenum;
      float sfx, music;
 } Game;
@@ -79,10 +80,14 @@ typedef struct
 Entity player[2], background, apple[E_SZ], grass[E_SZ], tree[E_SZ], bomb[E_SZ];
 Sound sound[4];
 Music music[4];
-Game game;
+Game game = {
+     .difficulty = 0,
+     .health = 10
+};
 Difficulty diff;
 Collision col;
 Rectangle buttons[10];
+
 
 sqlite3 *db;
 char *err_msg, sql[500];
@@ -101,6 +106,7 @@ void DrawMenu (void);
 void InitMenu (void);
 void UpdateAudio (void);
 void DrawPauseButton (void);
+void StatsMenu (void);
 void PauseMenu (void);
 void OptionsMenu (void);
 void EndMenu (void);
@@ -124,7 +130,7 @@ int main (int argc, char **argv)
      game.sfx = 0.10f;
      game.music = 0.25f;
 
-     rc = sqlite3_open ("res/db/stats.db", &db);
+     rc = sqlite3_open ("./res/db/stats.db", &db);
      strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER, Difficulty BOOLEAN);"
            "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG INTEGER PRIMARY KEY, Name TEXT);");
      
@@ -167,7 +173,7 @@ int main (int argc, char **argv)
 
 int callback(void *NotUsed, int argc, char **argv, char **azColName)
 {
-     NotUsed = 0;
+     (void) NotUsed;
      for (int i = 0; i < argc; i++)
           printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
      printf("\n");
@@ -189,7 +195,7 @@ void Commandline (int argc, char **argv)
           {
                printf ("arg[%d] == %s\n", argc, argv[i]);
                // truncate the res/db/stats.db file
-               FILE *f = fopen ("res/db/stats.db", "w");
+               FILE *f = fopen ("./res/db/stats.db", "w");
                fclose(f);
           }
      }
@@ -305,7 +311,7 @@ Rectangle DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, 
 
 void DrawBackground (float alpha, bool usesprite)
 {
-     Texture2D sprite = LoadTexture ("res/images/grass.png");
+     Texture2D sprite = LoadTexture ("./res/images/grass.png");
      Color c = WHITE;
      c.a = alpha;
      Rectangle rect = {
@@ -341,8 +347,7 @@ void DrawMenu (void)
      buttons[STATS] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
      if (CheckCollisionPointRec (input, buttons[STATS]))
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               //TODO: stats menu
-               printf ("Stats\n");
+               StatsMenu();
      strcpy (s, "Quit");
      buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
      if (CheckCollisionPointRec (input, buttons[QUIT]))
@@ -370,7 +375,7 @@ void InitMenu (void)
 
 void DrawPauseButton (void)
 {
-     Texture2D sprite = LoadTexture ("res/images/pause-button");
+     Texture2D sprite = LoadTexture ("./res/images/pause-button");
      Rectangle rect = {
           .width = 32,
           .height = 32,
@@ -397,6 +402,35 @@ void UpdateAudio (void)
      PlayMusicStream (music[0]);
 }
 
+void StatsMenu (void)
+{
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          int size = w.x/20;
+          char s[30];
+          Vector2 half = { w.x/2, w.y/2 };
+          Color fg = YELLOW, bg = { 40, 40, 40, 150 };
+          BeginDrawing();
+               ClearBackground (BLACK);
+               DrawBackground (180, 1);
+               strcpy (s, "Stats"); // menu title
+               Vector2 mid = CenterText (s, size, w);
+               DrawText (s, mid.x, w.y*0.10f, size, YELLOW);
+               strcpy (s, "Players"); // title of the first table
+               Vector2 pos = { mid.x/2, w.y*0.40f };
+               buttons[PLAY] = DrawTextButton (s, size/2, pos, 0, bg, fg);
+               /*
+               for (int i = 0; i < 3; i++)
+                    for (j = 0; j < 4; j++)
+                         DrawRectangleLinesEx (rect, thick, c);
+               */
+               
+          EndDrawing();
+     }
+}
+
 void PauseMenu (void)
 {
      game.pausenum++;
@@ -404,9 +438,8 @@ void PauseMenu (void)
      {
           w.x = GetRenderWidth();
           w.y = GetRenderHeight();
-          int size = w.x/10;
+          int size = w.x/20;
           char s[30];
-          size = w.x/20;
           Vector2 input = GetMousePosition();
           Color fg = YELLOW, bg = { 40, 40, 40, 2 };
           BeginDrawing();
@@ -507,8 +540,19 @@ void OptionsMenu (void)
                circle[1].x = offset + game.music * sliderlen;
                circle[1].y = slider[MUS][0].y;
                DrawCircleV (circle[1], w.x/75, YELLOW);
+               strcpy (s, "Difficulty: ");
+               if (game.difficulty)
+                    strcat (s, "Hard");
+               else strcat (s, "Easy");
+               buttons[DIFF] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[DIFF]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         //change difficulty so long as the game hasn't started
+                         if (!game.start)
+                              game.difficulty = !game.difficulty;
+                         
                strcpy (s, "Back");
-               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
                if (CheckCollisionPointRec (input, buttons[BACK]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          break;
@@ -637,25 +681,25 @@ void InitEntities (void)
 {
      for (int i = 1; i <= apple[0].num; i++)
      {
-          apple[i].sprite = LoadTexture ("res/images/reset.png");
+          apple[i].sprite = LoadTexture ("./res/images/reset.png");
           apple[i].x = -5;
           apple[i].y = -5;
      }
      for (int i = 1; i <= grass[0].num; i++)
      {
-          grass[i].sprite = LoadTexture ("res/images/reset.png");
+          grass[i].sprite = LoadTexture ("./res/images/reset.png");
           grass[i].x = -5;
           grass[i].y = -5;
      }
      for (int i = 1; i <= tree[0].num; i++)
      {
-          tree[i].sprite = LoadTexture ("res/images/reset.png");
+          tree[i].sprite = LoadTexture ("./res/images/reset.png");
           tree[i].x = -5;
           tree[i].y = -5;
      }
      for (int i = 1; i <= bomb[0].num; i++)
      {
-          bomb[i].sprite = LoadTexture ("res/images/reset.png");
+          bomb[i].sprite = LoadTexture ("./res/images/reset.png");
           bomb[i].x = -5;
           bomb[i].y = -5;
      }
@@ -672,37 +716,37 @@ void GenerateEntities (void)
      SetDifficulty (game.difficulty);
      for (int i = 1; i <= apple[0].num; i++)
      {
-          apple[i].sprite = LoadTexture ("res/images/apple.png");
+          apple[i].sprite = LoadTexture ("./res/images/apple.png");
           apple[i].x = GetRandomValue (5, w.x-32);
           apple[i].y = GetRandomValue (5, w.y-32);
      }
      for (int i = 1; i <= grass[0].num; i++)
      {
-          grass[i].sprite = LoadTexture ("res/images/grasstile.png");
+          grass[i].sprite = LoadTexture ("./res/images/grasstile.png");
           grass[i].x = GetRandomValue (5, w.x-32);
           grass[i].y = GetRandomValue (5, w.y-32);
      }
      for (int i = 1; i <= tree[0].num; i++)
      {
-          tree[i].sprite = LoadTexture ("res/images/tree.png");
+          tree[i].sprite = LoadTexture ("./res/images/tree.png");
           tree[i].x = GetRandomValue (5, w.x-32);
           tree[i].y = GetRandomValue (5, w.y-32);
      }
      for (int i = 1; i <= bomb[0].num; i++)
      {
-          bomb[i].sprite = LoadTexture ("res/images/bomb.png");
+          bomb[i].sprite = LoadTexture ("./res/images/bomb.png");
           bomb[i].x = GetRandomValue (5, w.x-32);
           bomb[i].y = GetRandomValue (5, w.y-32);
      }
      // player[0] is the main character
-     player[0].sprite = LoadTexture ("res/images/player-black.png");
+     player[0].sprite = LoadTexture ("./res/images/player-black.png");
      //player[0].speed = 3.5f;
      player[0].num = 1; //might add support for multiple players
      player[0].x = GetRandomValue (5, w.x-32);
      player[0].y = GetRandomValue (5, w.y-32);
      strcpy (player[0].name, "Player");
      // player[1] is the enemy
-     player[1].sprite = LoadTexture ("res/images/enemy-black.png");
+     player[1].sprite = LoadTexture ("./res/images/enemy-black.png");
      //player[1].speed = 1.5f;
      player[1].num = 1; //might add support for multiple enemies
      player[1].x = GetRandomValue (5, w.x-32);
@@ -762,7 +806,7 @@ void CalcCollisions (void)
                game.health += diff.health.inc.player;
                player[0].speed += diff.speed.player.inc;
                apple[i].used = 1;
-               apple[i].sprite = LoadTexture ("res/images/grasstile.png");
+               apple[i].sprite = LoadTexture ("./res/images/grasstile.png");
                PlaySound (sound[2]); //eat
                int rng = (apple[i].x + apple[i].y)/2;
                sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[0].name, rng, "Apple");
@@ -781,7 +825,7 @@ void CalcCollisions (void)
                if (player[0].speed < 0.0f)
                     player[0].speed = 0.0f;
                bomb[i].used = 1;
-               bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
+               bomb[i].sprite = LoadTexture ("./res/images/bombtile.png");
                int rng = (bomb[i].x + bomb[i].y)/2;
                sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[0].name, rng, "Bomb");
                strcpy (sql, buffer);
@@ -793,7 +837,7 @@ void CalcCollisions (void)
                PlaySound (sound[3]); //boom
                player[1].speed += diff.speed.enemy.inc;
                bomb[i].used = 1;
-               bomb[i].sprite = LoadTexture ("res/images/bombtile.png");
+               bomb[i].sprite = LoadTexture ("./res/images/bombtile.png");
                int rng = (bomb[i].x + bomb[i].y)/2;
                sprintf (buffer, "INSERT OR REPLACE INTO Obstacles VALUES ('%s', '%d', '%s');", player[1].name, rng, "Bomb");
                strcpy (sql, buffer);
@@ -843,17 +887,16 @@ void DrawHUD (void)
 
 void Gameplay (void)
 {
-     game.health = 10;
      game.delay = 0x1000*GetFrameTime();
-     game.difficulty = 0;
+     game.start = 1;
      
-     sound[1] = LoadSound ("res/sounds/oof.ogg");
-     sound[2] = LoadSound ("res/sounds/eat.ogg");
-     sound[3] = LoadSound ("res/sounds/boom.ogg");
+     sound[1] = LoadSound ("./res/sounds/oof.ogg");
+     sound[2] = LoadSound ("./res/sounds/eat.ogg");
+     sound[3] = LoadSound ("./res/sounds/boom.ogg");
      
-     music[1] = LoadMusicStream("res/music/music1.ogg");     
-     music[2] = LoadMusicStream("res/music/music2.ogg");     
-     music[3] = LoadMusicStream("res/music/music3.ogg");     
+     music[1] = LoadMusicStream("./res/music/music1.ogg");     
+     music[2] = LoadMusicStream("./res/music/music2.ogg");     
+     music[3] = LoadMusicStream("./res/music/music3.ogg");     
 
      UpdateAudio();
      PlayMusicStream (music[0]);
