@@ -14,6 +14,9 @@
 #define OPTIONS 2
 #define STATS 3
 #define QUIT 4
+#define SFX 5
+#define MUS 6
+#define BACK 7
 
 typedef struct
 {
@@ -78,7 +81,7 @@ Music music[4];
 Game game;
 Difficulty diff;
 Collision col;
-Vector2Pair buttons[10];
+Rectangle buttons[10];
 
 sqlite3 *db;
 char *err_msg, sql[500];
@@ -91,13 +94,17 @@ void Commandline (int argc, char **argv);
 bool IsCollision (Entity *a, Entity *b, float c);
 void SetDifficulty (bool difficulty);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
-Vector2Pair DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
+Rectangle DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
 void DrawBackground (float alpha, bool usesprite);
 void DrawMenu (void);
 void InitMenu (void);
+void DrawPauseButton (void);
+void PauseMenu (void);
+void OptionsMenu (void);
 void EndMenu (void);
 void PlayerMovement (void);
 void EnemyMovement (void);
+void InitEntities (void);
 void GenerateEntities (void);
 void DrawEntities (void);
 void CalcCollisions (void);
@@ -279,7 +286,7 @@ Vector2 CenterText (const char *s, int size, Vector2 pos)
      return newpos;
 }
 
-Vector2Pair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
+Rectangle DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, Color bg, Color fg)
 {
      Vector2 center = CenterText (s, textsize, pos);
      Font font = GetFontDefault();
@@ -287,11 +294,8 @@ Vector2Pair DrawTextButton (const char *s, int textsize, Vector2 pos, int offset
      DrawRectangle (center.x, center.y+offset, rectsize.x, rectsize.y, bg);
      DrawText (s, center.x, center.y+offset, textsize, fg);
      center.y += offset;
-     Vector2Pair v = {
-          center,
-          Vector2Add(center, rectsize),
-     };
-     return v;
+     Rectangle rect = { center.x, center.y, rectsize.x, rectsize.y };
+     return rect;
 }
 
 void DrawBackground (float alpha, bool usesprite)
@@ -320,28 +324,23 @@ void DrawMenu (void)
      Color fg = YELLOW, bg = { 40, 40, 40, 120 };
      strcpy (s, "Play");
      buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
-     if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
-          input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
+     if (CheckCollisionPointRec (input, buttons[PLAY]))
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                Gameplay ();
      strcpy (s, "Options");
      buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
-     if (input.x >= buttons[OPTIONS].a.x && input.x <= buttons[OPTIONS].b.x &&
-          input.y >= buttons[OPTIONS].a.y && input.y <= buttons[OPTIONS].b.y)
+     if (CheckCollisionPointRec (input, buttons[OPTIONS]))
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-               //TODO: options menu
-               printf ("Options\n");
+               OptionsMenu();
      strcpy (s, "Stats");
      buttons[STATS] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
-     if (input.x >= buttons[STATS].a.x && input.x <= buttons[STATS].b.x &&
-          input.y >= buttons[STATS].a.y && input.y <= buttons[STATS].b.y)
+     if (CheckCollisionPointRec (input, buttons[STATS]))
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                //TODO: stats menu
                printf ("Stats\n");
      strcpy (s, "Quit");
      buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
-     if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
-          input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
+     if (CheckCollisionPointRec (input, buttons[QUIT]))
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                game.close = 1;
 }
@@ -354,13 +353,112 @@ void InitMenu (void)
           w.y = GetRenderHeight();
           BeginDrawing();
                ClearBackground (BLACK);
-               DrawBackground (150, 1);
+               DrawBackground (180, 1);
                DrawMenu();
           EndDrawing();
                if (IsKeyPressed(KEY_Q))
                     game.close = 1;
                if (game.close)
                     break;
+     }
+}
+
+void DrawPauseButton (void)
+{
+     Texture2D sprite = LoadTexture ("res/images/pause-button");
+     Rectangle rect = {
+          .width = 32,
+          .height = 32,
+     };
+     Color c = WHITE;
+     c.a = 0;
+     SetShapesTexture (sprite, rect);
+     DrawRectangle (w.x-33, 1, 32, 32, c);
+     Vector2 input = GetMousePosition();
+     if (CheckCollisionPointRec (input, rect))
+          PauseMenu();
+}
+
+void PauseMenu (void)
+{
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          int size = w.x/10;
+          char s[30];
+          size = w.x/20;
+          Vector2 input = GetMousePosition();
+          Color fg = YELLOW, bg = { 40, 40, 40, 2 };
+          BeginDrawing();
+               //ClearBackground (BLACK);
+               //DrawBackground (255, 0);
+               
+               strcpy (s, "Paused!");
+               Vector2 mid = CenterText (s, size, w);
+               DrawText (s, mid.x, mid.y/2, size, YELLOW);
+               strcpy (s, "Resume");
+               buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[PLAY]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         break;
+               strcpy (s, "Options");
+               buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[OPTIONS]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         OptionsMenu();
+               strcpy (s, "Quit to Menu");
+               buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[QUIT]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         InitMenu();
+               
+          EndDrawing();
+          if (IsKeyPressed(KEY_Q))
+               game.close = 1;
+          if (game.close)
+               break;
+     }
+}
+
+void OptionsMenu (void)
+{
+     while (!WindowShouldClose())
+     {
+          w.x = GetRenderWidth();
+          w.y = GetRenderHeight();
+          int size = w.x/10;
+          char s[30];
+          size = w.x/20;
+          Vector2 input = GetMousePosition();
+          Color fg = YELLOW, bg = { 40, 40, 40, 150 };
+          BeginDrawing();
+               ClearBackground (BLACK);
+               DrawBackground (180, 1);
+               
+               strcpy (s, "Options");
+               Vector2 mid = CenterText (s, size, w);
+               DrawText (s, mid.x, mid.y/2, size, YELLOW);
+               strcpy (s, "SFX: ");
+               buttons[SFX] = DrawTextButton (s, size, w, 0, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[SFX]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         //Stuff
+               strcpy (s, "Music: ");
+               buttons[MUS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[MUS]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         //TODO: options menu
+               strcpy (s, "Back");
+               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[BACK]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         break;
+          EndDrawing();
+          if (IsKeyPressed(KEY_Q))
+               game.close = 1;
+          if (game.close)
+               break;
      }
 }
 
@@ -384,7 +482,7 @@ void EndMenu (void)
           Color fg = YELLOW, bg = { 40, 40, 40, 120 };
           BeginDrawing();
                //ClearBackground (BLACK);
-               //DrawBackground (150, 0);
+               //DrawBackground (255, 0);
                if (game.won)
                {
                     strcpy (s, "You Won!");
@@ -412,22 +510,20 @@ void EndMenu (void)
                }
                strcpy (s, "Play Again");
                buttons[PLAY] = DrawTextButton (s, size, half, w.x*0.10f, bg, fg);
-               if (input.x >= buttons[PLAY].a.x && input.x <= buttons[PLAY].b.x &&
-                    input.y >= buttons[PLAY].a.y && input.y <= buttons[PLAY].b.y)
+               if (CheckCollisionPointRec (input, buttons[PLAY]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          Gameplay();
                strcpy (s, "Quit to Menu");
                buttons[QUIT] = DrawTextButton (s, size, most, w.x*0.10f, bg, fg);
-               if (input.x >= buttons[QUIT].a.x && input.x <= buttons[QUIT].b.x &&
-                    input.y >= buttons[QUIT].a.y && input.y <= buttons[QUIT].b.y)
+               if (CheckCollisionPointRec (input, buttons[QUIT]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          InitMenu();
                
           EndDrawing();
-               if (IsKeyPressed(KEY_Q))
-                    game.close = 1;
-               if (game.close)
-                    break;
+          if (IsKeyPressed(KEY_Q))
+               game.close = 1;
+          if (game.close)
+               break;
      }
 }
 
@@ -475,6 +571,38 @@ void EnemyMovement (void)
           player[1].x = w.x-32;
      if (player[1].y >= w.y-32)
           player[1].y = w.y-32;
+}
+
+void InitEntities (void)
+{
+     for (int i = 1; i <= apple[0].num; i++)
+     {
+          apple[i].sprite = LoadTexture ("res/images/reset.png");
+          apple[i].x = -5;
+          apple[i].y = -5;
+     }
+     for (int i = 1; i <= grass[0].num; i++)
+     {
+          grass[i].sprite = LoadTexture ("res/images/reset.png");
+          grass[i].x = -5;
+          grass[i].y = -5;
+     }
+     for (int i = 1; i <= tree[0].num; i++)
+     {
+          tree[i].sprite = LoadTexture ("res/images/reset.png");
+          tree[i].x = -5;
+          tree[i].y = -5;
+     }
+     for (int i = 1; i <= bomb[0].num; i++)
+     {
+          bomb[i].sprite = LoadTexture ("res/images/reset.png");
+          bomb[i].x = -5;
+          bomb[i].y = -5;
+     }
+     // player[0] is the main character
+     UnloadTexture(player[0].sprite);
+     // player[1] is the enemy
+     UnloadTexture(player[1].sprite);
 }
 
 void GenerateEntities (void)
@@ -538,13 +666,17 @@ void GenerateEntities (void)
 void DrawEntities (void)
 {
      for (int i = 1; i <= apple[0].num; i++)
-          DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
+          if (apple[i].x && apple[i].y)
+               DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
      for (int i = 1; i <= grass[0].num; i++)
-          DrawTexture (grass[i].sprite, grass[i].x, grass[i].y, WHITE);
+          if (grass[i].x && grass[i].y)
+               DrawTexture (grass[i].sprite, grass[i].x, grass[i].y, WHITE);
      for (int i = 1; i <= tree[0].num; i++)
-          DrawTexture (tree[i].sprite, tree[i].x, tree[i].y, WHITE);
+          if (tree[i].x && tree[i].y)
+               DrawTexture (tree[i].sprite, tree[i].x, tree[i].y, WHITE);
      for (int i = 1; i <= bomb[0].num; i++)
-          DrawTexture (bomb[i].sprite, bomb[i].x, bomb[i].y, WHITE);
+          if (bomb[i].x && bomb[i].y)
+               DrawTexture (bomb[i].sprite, bomb[i].x, bomb[i].y, WHITE);
      if (game.score > apple[0].num * diff.reveal.a && game.score < apple[0].num * diff.reveal.b)
      {
           char s[] = "Hidden apples have been revealed!\0";
@@ -552,7 +684,8 @@ void DrawEntities (void)
           Vector2 mid = CenterText (s, size, w);
           DrawText (s, mid.x, mid.y, size, YELLOW);
           for (int i = 1; i <= apple[0].num; i++)
-               DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
+               if (apple[i].x && apple[i].y)
+                    DrawTexture (apple[i].sprite, apple[i].x, apple[i].y, WHITE);
      }
      DrawTexture (player[0].sprite, player[0].x, player[0].y, WHITE);
      DrawTexture (player[1].sprite, player[1].x, player[1].y, WHITE);
@@ -674,6 +807,7 @@ void Gameplay (void)
      PlayMusicStream (music[0]);
      SetMusicVolume (music[0], 0.25f);
 
+     //InitEntities();
      GenerateEntities();
      while (!WindowShouldClose() && !game.close)
      {
@@ -689,16 +823,18 @@ void Gameplay (void)
                DrawBackground(255, 1);
                DrawEntities();
                DrawHUD();
+               if (IsKeyPressed (KEY_P))
+                    PauseMenu();
+               DrawPauseButton();
           EndDrawing();
           if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
           {
                GenerateEntities();
                DrawEntities();
                DrawHUD();
+               DrawPauseButton();
           }
           if (IsKeyPressed (KEY_Q))
-               break;
-          if (IsKeyPressed (KEY_F))
-               printf ("(%.3f %.3f)\n", player[0].x, player[0].y);
+               game.close = 1;
      }
 }
