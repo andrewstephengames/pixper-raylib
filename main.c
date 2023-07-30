@@ -40,7 +40,8 @@ typedef struct
 typedef struct
 {
      bool close, mutemusic, mutesound, difficulty, won;
-     int score, health, delay;
+     int score, health, delay, pausenum;
+     float sfx, music;
 } Game;
 
 typedef struct
@@ -98,6 +99,7 @@ Rectangle DrawTextButton (const char *s, int size, Vector2 pos, int offset, Colo
 void DrawBackground (float alpha, bool usesprite);
 void DrawMenu (void);
 void InitMenu (void);
+void UpdateAudio (void);
 void DrawPauseButton (void);
 void PauseMenu (void);
 void OptionsMenu (void);
@@ -119,6 +121,9 @@ int main (int argc, char **argv)
      SetTargetFPS(60);
      SetTraceLogLevel(LOG_ERROR);
      SetRandomSeed(clock());
+     game.sfx = 0.10f;
+     game.music = 0.25f;
+
      rc = sqlite3_open ("res/db/stats.db", &db);
      strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER, Difficulty BOOLEAN);"
            "CREATE TABLE IF NOT EXISTS Obstacles (Playername TEXT, RNG INTEGER PRIMARY KEY, Name TEXT);");
@@ -379,8 +384,22 @@ void DrawPauseButton (void)
           PauseMenu();
 }
 
+void UpdateAudio (void)
+{
+     size_t soundsize = sizeof(sound) / sizeof (Sound) - 1;
+     for (size_t i = 1; i <= soundsize; i++)
+          SetSoundVolume(sound[i], game.sfx);
+     size_t musicindex, musicsize;
+     musicsize = sizeof(music) / sizeof(Music);
+     musicindex = GetRandomValue (1, musicsize-1);
+     music[0] = music[musicindex];
+     SetMusicVolume (music[0], game.music);
+     PlayMusicStream (music[0]);
+}
+
 void PauseMenu (void)
 {
+     game.pausenum++;
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -391,8 +410,12 @@ void PauseMenu (void)
           Vector2 input = GetMousePosition();
           Color fg = YELLOW, bg = { 40, 40, 40, 2 };
           BeginDrawing();
-               //ClearBackground (BLACK);
-               //DrawBackground (255, 0);
+               if (game.pausenum % 2 == 0)
+               {
+                    ClearBackground (BLACK);
+                    bg.a = 150;
+                    DrawBackground (180, 0);
+               }
                
                strcpy (s, "Paused!");
                Vector2 mid = CenterText (s, size, w);
@@ -406,7 +429,11 @@ void PauseMenu (void)
                buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
                if (CheckCollisionPointRec (input, buttons[OPTIONS]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                    {
                          OptionsMenu();
+                         game.pausenum++;
+                         UpdateAudio(); // audio must be updated when the game is resumed
+                    }
                strcpy (s, "Quit to Menu");
                buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
                if (CheckCollisionPointRec (input, buttons[QUIT]))
@@ -439,16 +466,47 @@ void OptionsMenu (void)
                strcpy (s, "Options");
                Vector2 mid = CenterText (s, size, w);
                DrawText (s, mid.x, mid.y/2, size, YELLOW);
-               strcpy (s, "SFX: ");
-               buttons[SFX] = DrawTextButton (s, size, w, 0, bg, fg);
+               strcpy (s, "Sfx: ");
+               Vector2 half = { w.x/2, w.y }, slider[10][2];
+               buttons[SFX] = DrawTextButton (s, size, half, 0, bg, fg);
                if (CheckCollisionPointRec (input, buttons[SFX]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-                         //Stuff
+                         printf ("SFX\n");
+               slider[SFX][0] = (Vector2) { 0.35f * w.x, w.y/2 };
+               slider[SFX][1] = (Vector2) { 0.80f * w.x, w.y/2 };
+               DrawLineEx (slider[SFX][0], slider[SFX][1], w.x/100, YELLOW);
+               int sliderlen = slider[SFX][1].x - slider[SFX][0].x + 1;
+               int offset = slider[SFX][0].x;
+               Vector2 circle[2];
+               if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+                    if (CheckCollisionPointLine (input, slider[SFX][0], slider[SFX][1], w.x/100))
+                    {
+                         circle[0].x = input.x;
+                         game.sfx = (input.x - offset) / sliderlen;
+                    }
+               circle[0].x = offset + game.sfx * sliderlen;
+               circle[0].y = slider[SFX][0].y;
+               DrawCircleV (circle[0], w.x/75, YELLOW);
+               input = GetMousePosition();
                strcpy (s, "Music: ");
-               buttons[MUS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
+               buttons[MUS] = DrawTextButton (s, size, half, w.x*0.06f, bg, fg);
                if (CheckCollisionPointRec (input, buttons[MUS]))
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-                         //TODO: options menu
+                         printf ("Music\n");
+               slider[MUS][0] = (Vector2) { 0.35f * w.x, w.y/2+w.x*0.06f };
+               slider[MUS][1] = (Vector2) { 0.80f * w.x, w.y/2+w.x*0.06f };
+               DrawLineEx (slider[MUS][0], slider[MUS][1], w.x/100, YELLOW);
+               sliderlen = slider[MUS][1].x - slider[MUS][0].x + 1;
+               offset = slider[MUS][0].x;
+               if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+               if (CheckCollisionPointLine (input, slider[MUS][0], slider[MUS][1], w.x/100))
+                    {
+                         circle[1].x = input.x;
+                         game.music = (input.x - offset) / sliderlen;
+                    }
+               circle[1].x = offset + game.music * sliderlen;
+               circle[1].y = slider[MUS][0].y;
+               DrawCircleV (circle[1], w.x/75, YELLOW);
                strcpy (s, "Back");
                buttons[BACK] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
                if (CheckCollisionPointRec (input, buttons[BACK]))
@@ -457,6 +515,8 @@ void OptionsMenu (void)
           EndDrawing();
           if (IsKeyPressed(KEY_Q))
                game.close = 1;
+          if (IsKeyPressed(KEY_F))
+               printf ("Mouse: (%.f %.f)\n", GetMousePosition().x, GetMousePosition().y);
           if (game.close)
                break;
      }
@@ -790,22 +850,13 @@ void Gameplay (void)
      sound[1] = LoadSound ("res/sounds/oof.ogg");
      sound[2] = LoadSound ("res/sounds/eat.ogg");
      sound[3] = LoadSound ("res/sounds/boom.ogg");
-
-     size_t soundsize = sizeof(sound) / sizeof (Sound) - 1;
-     for (size_t i = 1; i <= soundsize; i++)
-          SetSoundVolume(sound[i], 0.10f);
-
+     
      music[1] = LoadMusicStream("res/music/music1.ogg");     
      music[2] = LoadMusicStream("res/music/music2.ogg");     
      music[3] = LoadMusicStream("res/music/music3.ogg");     
 
-     size_t musicindex, musicsize;
-     musicsize = sizeof(music) / sizeof(Music);
-     musicindex = GetRandomValue (1, musicsize-1);
-     music[0] = music[musicindex];
-
+     UpdateAudio();
      PlayMusicStream (music[0]);
-     SetMusicVolume (music[0], 0.25f);
 
      //InitEntities();
      GenerateEntities();
