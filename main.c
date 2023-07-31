@@ -102,6 +102,7 @@ void SetDifficulty (bool difficulty);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
 Rectangle DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
 void DrawBackground (float alpha, bool usesprite);
+bool IsAnyKeyPressed (void);
 void DrawMenu (void);
 void InitMenu (void);
 void UpdateAudio (void);
@@ -129,6 +130,7 @@ int main (int argc, char **argv)
      SetRandomSeed(clock());
      game.sfx = 0.10f;
      game.music = 0.25f;
+     strcpy (player[0].name, "Player");
 
      rc = sqlite3_open ("./res/db/stats.db", &db);
      strcpy (sql, "CREATE TABLE IF NOT EXISTS Players (Name TEXT PRIMARY KEY, Score INTEGER, Difficulty BOOLEAN);"
@@ -327,13 +329,23 @@ void DrawBackground (float alpha, bool usesprite)
      DrawRectangle (0, 0, w.x, w.y, c);
 }
 
+bool IsAnyKeyPressed(void)
+{
+    bool keyPressed = false;
+    int key = GetKeyPressed();
+
+    if ((key >= 32) && (key <= 126)) keyPressed = true;
+
+    return keyPressed;
+}
+
 void DrawMenu (void)
 {
      int size = w.x/10;
      char s[30];
      strcpy (s, "Pixper");
      Vector2 mid = CenterText (s, size, w);
-     DrawText (s, mid.x, mid.y/2, size, YELLOW);
+     DrawText (s, mid.x, mid.y/2-w.x/24, size, YELLOW);
      size = w.x/20;
      Vector2 input = GetMousePosition();
      Color fg = YELLOW, bg = { 40, 40, 40, 120 };
@@ -363,13 +375,66 @@ void InitMenu (void)
 {
      strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC LIMIT 5");
      rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
+     int lc = 0, fc = 0;
+     bool mouse = false;
+     char name[20] = "\0";
+     Rectangle textbox = {
+          w.x/2 - w.x/12,
+          w.y/2 - w.x/12,
+          w.x/6,
+          w.x/24,
+     };
+     Color fg = YELLOW, bg = { 40, 40, 40, 120 };
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
           w.y = GetRenderHeight();
+          textbox = (Rectangle) {
+               w.x/2 - w.x/12,
+               w.y/2 - w.x/12,
+               w.x/6,
+               w.x/24,
+          };
+          Vector2 input = GetMousePosition();
+          mouse = CheckCollisionPointRec (input, textbox);
+          if (mouse)
+          {
+               SetMouseCursor (MOUSE_CURSOR_IBEAM);
+               int key = GetCharPressed();
+               while (key > 0)
+               {
+                    if (key >= 32 && key <= 125 && lc < (int)sizeof (name)-1)
+                    {
+                         name[lc] = (char) key;
+                         name[++lc] = '\0';
+                    }
+                    key = GetCharPressed();
+               }
+               if (IsKeyPressed (KEY_BACKSPACE))
+               {
+                    lc--;
+                    if (lc < 0) lc = 0;
+                    name[lc] = '\0';
+               }
+          }
+          else SetMouseCursor (MOUSE_CURSOR_DEFAULT);
+          if (mouse) fc++;
+          else fc = 0;
           BeginDrawing();
                ClearBackground (BLACK);
                DrawBackground (180, 1);
+               DrawRectangleRec (textbox, bg);
+               //if (mouse) DrawRectangleLinesEx (textbox, w.x/500, RED);
+               //else DrawRectangleLinesEx (textbox, w.x/500, DARKGRAY);
+               if (mouse) bg.a = 60;
+               else bg.a = 120;
+               DrawText (name, (int) textbox.x+w.x/200, textbox.y, w.x/25, fg);
+               if (mouse)
+                    if (lc < (int) sizeof (name))
+                         if ((fc/20)%2 == 0)
+                              DrawText ("|", textbox.x+w.x/200+MeasureText(name, w.x/25), textbox.y, w.x/25, fg);
+               if (IsKeyPressed (KEY_ENTER))
+                   strcpy (player[0].name, name);
                DrawMenu();
           EndDrawing();
                if (IsKeyPressed(KEY_Q))
@@ -447,7 +512,6 @@ void StatsMenu (void)
                     DrawText (s, half.x/2, w.y/5+w.y*0.10f, size/2, YELLOW);
                     strcpy (s, "Play some more to see your matches here!");
                     DrawText (s, half.x/2, w.y/5+w.y*0.20f, size/2, YELLOW);
-                    strcpy (s, "Play some more to see your matches here!");
                }
                Vector2 input = GetMousePosition();
                strcpy (s, "Back");
@@ -776,7 +840,6 @@ void GenerateEntities (void)
      player[0].num = 1; //might add support for multiple players
      player[0].x = GetRandomValue (5, w.x-32);
      player[0].y = GetRandomValue (5, w.y-32);
-     strcpy (player[0].name, "Player");
      // player[1] is the enemy
      player[1].sprite = LoadTexture ("./res/images/enemy-black.png");
      //player[1].speed = 1.5f;
