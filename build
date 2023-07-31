@@ -7,4 +7,4 @@ CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
 LIBS="`pkg-config --libs raylib` -lglfw -ldl -lm -lsqlite3"
 
 gcc $CFLAGS $1 $LIBS
-./a.out mutemusic #cleardb
+./a.out #mutemusic #cleardb
