@@ -90,8 +90,8 @@ Rectangle buttons[10];
 
 
 sqlite3 *db;
-char *err_msg, sql[500];
-int rc;
+char *err_msg, sql[500], entries[5][3][50];
+int rc, entrynum;
 
 // all functions used
 // FIXME: refactoring
@@ -156,10 +156,6 @@ int main (int argc, char **argv)
      StopMusicStream(music[0]);
      CloseAudioDevice();
      CloseWindow();
-     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
-     strcpy (sql, "SELECT Playername, RNG, Name FROM Obstacles ORDER BY RNG DESC LIMIT 3");
-     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
      if (rc != SQLITE_OK)
      {
           fprintf (stderr, "Failed to select data\n");
@@ -174,9 +170,17 @@ int main (int argc, char **argv)
 int callback(void *NotUsed, int argc, char **argv, char **azColName)
 {
      (void) NotUsed;
+     int k = 0;
      for (int i = 0; i < argc; i++)
+     {
           printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+          if (argv[i])
+               strcpy (entries[entrynum][k++], argv[i]);
+     }
+     for (int i = 0; i < k; i++)
+          printf ("entries[%d][%d] = %s\n", entrynum, i, entries[entrynum][i]);
      printf("\n");
+     entrynum++;
      return 0;
 }
 
@@ -357,6 +361,8 @@ void DrawMenu (void)
 
 void InitMenu (void)
 {
+     strcpy (sql, "SELECT Name, Score, Difficulty FROM Players ORDER BY Score DESC LIMIT 5");
+     rc = sqlite3_exec (db, sql, callback, 0, &err_msg); 
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -409,7 +415,7 @@ void StatsMenu (void)
           w.x = GetRenderWidth();
           w.y = GetRenderHeight();
           int size = w.x/20;
-          char s[30];
+          char s[120], d[10];
           Vector2 half = { w.x/2, w.y/2 };
           Color fg = YELLOW, bg = { 40, 40, 40, 150 };
           BeginDrawing();
@@ -418,16 +424,42 @@ void StatsMenu (void)
                strcpy (s, "Stats"); // menu title
                Vector2 mid = CenterText (s, size, w);
                DrawText (s, mid.x, w.y*0.10f, size, YELLOW);
-               strcpy (s, "Players"); // title of the first table
-               Vector2 pos = { mid.x/2, w.y*0.40f };
-               buttons[PLAY] = DrawTextButton (s, size/2, pos, 0, bg, fg);
-               /*
-               for (int i = 0; i < 3; i++)
-                    for (j = 0; j < 4; j++)
-                         DrawRectangleLinesEx (rect, thick, c);
-               */
-               
+               strcpy (s, "Latest Matches");
+               buttons[PLAY] = DrawTextButton (s, size/2, half, 0, bg, fg);
+               int i = 0;  
+               for (i = 0; i < entrynum; i++)
+               {
+                    if (atoi(entries[i][2]) == 0)
+                         strcpy (d, "easy");
+                    else strcpy (d, "hard");
+                    if (strcmp (entries[i][0], "Enemy") != 0)
+                         sprintf (s, "%d. %s collected %d apples on %s difficulty.",
+                                  i+1, entries[i][0], atoi(entries[i][1]), d);
+                    else
+                         sprintf (s, "%d. %s stole %d apples on %s difficulty.",
+                                   i+1, entries[i][0], atoi(entries[i][1]), d);
+                    DrawText (s, half.x/2, w.y/5+w.y*0.10f*(i+1), size/2, YELLOW);
+                    //w.y/5 is the offset, w.y*0.10f*(i+1) is the distance between each entry
+               }
+               if (i == 0)
+               {
+                    strcpy (s, "No matches were found in the database.");
+                    DrawText (s, half.x/2, w.y/5+w.y*0.10f, size/2, YELLOW);
+                    strcpy (s, "Play some more to see your matches here!");
+                    DrawText (s, half.x/2, w.y/5+w.y*0.20f, size/2, YELLOW);
+                    strcpy (s, "Play some more to see your matches here!");
+               }
+               Vector2 input = GetMousePosition();
+               strcpy (s, "Back");
+               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
+               if (CheckCollisionPointRec (input, buttons[BACK]))
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                         break;
           EndDrawing();
+          if (IsKeyPressed (KEY_Q))
+               game.close = 1;
+          if (game.close) 
+               break;
      }
 }
 
@@ -930,5 +962,12 @@ void Gameplay (void)
           }
           if (IsKeyPressed (KEY_Q))
                game.close = 1;
+     }
+     if (rc != SQLITE_OK)
+     {
+          fprintf (stderr, "Failed to select data\n");
+          fprintf (stderr, "SQL Error: %s\n", err_msg);
+          sqlite3_close(db);
+          return;
      }
 }
