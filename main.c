@@ -54,17 +54,10 @@ typedef struct
           {
                int player, enemy;
           } inc, dec;
-     } health;
+     } health, speed;
      struct
      {
-          struct
-          {
-               float inc, dec;
-          } player, enemy;
-     } speed;
-     struct
-     {
-          float a, b;
+          float left, right;
      } reveal;
 } Difficulty;
 
@@ -73,9 +66,16 @@ typedef struct
      int player, enemy, apple;
      struct
      {
-          int p, e;
+          int player, enemy;
      } bomb;
 } Collision;
+
+typedef struct
+{
+     Rectangle box;
+     Texture2D sprite;
+     Color fg, bg;
+} Buttons;
 
 Entity player[2], background, apple[E_SZ], grass[E_SZ], tree[E_SZ], bomb[E_SZ];
 Sound sound[4];
@@ -86,7 +86,7 @@ Game game = {
 };
 Difficulty diff;
 Collision col;
-Rectangle buttons[10];
+Buttons buttons[10];
 
 
 sqlite3 *db;
@@ -101,12 +101,12 @@ bool IsCollision (Entity *a, Entity *b, float c);
 void SetDifficulty (bool difficulty);
 Vector2 CenterText (const char *s, int size, Vector2 pos);
 Rectangle DrawTextButton (const char *s, int size, Vector2 pos, int offset, Color bg, Color fg);
-void DrawBackground (float alpha, bool usesprite);
+Texture2D DrawBackground (float alpha, bool usesprite);
 bool IsAnyKeyPressed (void);
 void DrawMenu (void);
 void InitMenu (void);
 void UpdateAudio (void);
-void DrawPauseButton (void);
+Buttons DrawPauseButton (void);
 void StatsMenu (void);
 void PauseMenu (void);
 void OptionsMenu (void);
@@ -116,6 +116,7 @@ void EnemyMovement (void);
 void InitEntities (void);
 void GenerateEntities (void);
 void DrawEntities (void);
+void UnloadEntities (void);
 void CalcCollisions (void);
 void DrawHUD (void);
 void Gameplay (void);
@@ -144,17 +145,15 @@ int main (int argc, char **argv)
           return 1;
      }
      Commandline(argc, argv);
+     // set the default color scheme for every button
+     Color f = YELLOW, b = { 40, 40, 40, 120 };
+     for (int i = PLAY; i <= BACK; i++)
+     {
+          buttons[i].bg = b;
+          buttons[i].fg = f;
+     }
      InitMenu();
-     UnloadTexture (player[0].sprite);
-     UnloadTexture (background.sprite);
-     for (int i = 1; i < 100; i++)
-          if (grass[i].num || apple[i].num || bomb[i].num || tree[i].num)
-          {
-               UnloadTexture (grass[i].sprite);
-               UnloadTexture (apple[i].sprite);
-               UnloadTexture (bomb[i].sprite);
-               UnloadTexture (tree[i].sprite);
-          }
+     UnloadEntities();
      StopMusicStream(music[0]);
      CloseAudioDevice();
      CloseWindow();
@@ -171,17 +170,18 @@ int main (int argc, char **argv)
 
 int callback(void *NotUsed, int argc, char **argv, char **azColName)
 {
-     (void) NotUsed;
+     (void) NotUsed; //sqlite3.h requires a void* argument for the callback
+     (void) azColName; //only used for printing table contents
      int k = 0;
      for (int i = 0; i < argc; i++)
      {
-          printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+//          printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
           if (argv[i])
                strcpy (entries[entrynum][k++], argv[i]);
      }
-     for (int i = 0; i < k; i++)
-          printf ("entries[%d][%d] = %s\n", entrynum, i, entries[entrynum][i]);
-     printf("\n");
+//     for (int i = 0; i < k; i++)
+//          printf ("entries[%d][%d] = %s\n", entrynum, i, entries[entrynum][i]);
+//     printf("\n");
      entrynum++;
      return 0;
 }
@@ -193,7 +193,7 @@ void Commandline (int argc, char **argv)
      {
           if (strcmp (argv[i], "mutemusic") == 0)
           {
-               printf ("arg[%d] == %s\n", argc, argv[i]);
+//               printf ("arg[%d] == %s\n", argc, argv[i]);
                PauseMusicStream(music[0]);
                game.mutemusic = 1;
           }
@@ -225,8 +225,8 @@ void SetDifficulty (bool difficulty)
           player[1].speed = 2.5f;
           game.health = 5;
           // Interval of apple percentage consumed for the hidden apples to be revealed
-          diff.reveal.a = 0.75f;
-          diff.reveal.b = 0.85f;
+          diff.reveal.left = 0.75f;
+          diff.reveal.right = 0.85f;
           // the score increase determined by the difficulty
           diff.score = 1;
           // health increase when the player encounters an apple
@@ -236,19 +236,19 @@ void SetDifficulty (bool difficulty)
           // health decrease when the player hits a bomb
           diff.health.dec.player = 10;
           // speed decrease when the player encounters the enemy
-          diff.speed.player.dec = 0.005f;
+          diff.speed.dec.player = 0.005f;
           // speed increase when the enemy encounters a bomb
-          diff.speed.enemy.inc = 0.20f;
+          diff.speed.inc.enemy = 0.20f;
           // speed decrease when the player encounters a bomb
-          diff.speed.player.dec = 0.20f;
+          diff.speed.dec.player = 0.20f;
           // speed increase when the player encounters an apple
-          diff.speed.player.inc = 0.025f;
+          diff.speed.inc.player = 0.025f;
           // Collision with an apple
           col.apple = 5;
           // Player collision with a bomb
-          col.bomb.p = 30;
+          col.bomb.player = 30;
           // Enemy collision with a bomb
-          col.bomb.e = 30;
+          col.bomb.enemy = 30;
           // Player collision with the enemy
           col.enemy = 30;
      }
@@ -261,8 +261,8 @@ void SetDifficulty (bool difficulty)
           player[1].speed = 1.5f;
           game.health = 10;
           // Interval of apple percentage consumed for the hidden apples to be revealed
-          diff.reveal.a = 0.60f;
-          diff.reveal.b = 0.90f;
+          diff.reveal.left = 0.60f;
+          diff.reveal.right = 0.90f;
           // the score increase determined by the difficulty
           diff.score = 1;
           // health increase when the player encounters an apple
@@ -272,19 +272,19 @@ void SetDifficulty (bool difficulty)
           // health decrease when the player hits a bomb
           diff.health.dec.player = 3;
           // speed decrease when the player encounters the enemy
-          diff.speed.player.dec = 0.001f;
+          diff.speed.dec.player = 0.001f;
           // speed increase when the enemy encounters a bomb
-          diff.speed.enemy.inc = 0.10f;
+          diff.speed.inc.enemy = 0.10f;
           // speed decrease when the player encounters a bomb
-          diff.speed.player.dec = 0.10f;
+          diff.speed.dec.player = 0.10f;
           // speed increase when the player encounters an apple
-          diff.speed.player.inc = 0.05f;
+          diff.speed.inc.player = 0.05f;
           // Collision with an apple
           col.apple = 15;
           // Player collision with a bomb
-          col.bomb.p = 15;
+          col.bomb.player = 15;
           // Enemy collision with a bomb
-          col.bomb.e = 15;
+          col.bomb.enemy = 15;
           // Player collision with the enemy
           col.enemy = 15;
      }
@@ -315,7 +315,7 @@ Rectangle DrawTextButton (const char *s, int textsize, Vector2 pos, int offset, 
      return rect;
 }
 
-void DrawBackground (float alpha, bool usesprite)
+Texture2D DrawBackground (float alpha, bool usesprite)
 {
      Texture2D sprite = LoadTexture ("./res/images/grass.png");
      Color c = WHITE;
@@ -327,6 +327,7 @@ void DrawBackground (float alpha, bool usesprite)
      if (usesprite)
           SetShapesTexture (sprite, rect);
      DrawRectangle (0, 0, w.x, w.y, c);
+     return sprite;
 }
 
 bool IsAnyKeyPressed(void)
@@ -348,27 +349,45 @@ void DrawMenu (void)
      DrawText (s, mid.x, mid.y/2-w.x/24, size, YELLOW);
      size = w.x/20;
      Vector2 input = GetMousePosition();
-     Color fg = YELLOW, bg = { 40, 40, 40, 120 };
      strcpy (s, "Play");
-     buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
-     if (CheckCollisionPointRec (input, buttons[PLAY]))
+     buttons[PLAY].box = DrawTextButton (s, size, w, 0, buttons[PLAY].bg, buttons[PLAY].fg);
+     if (CheckCollisionPointRec (input, buttons[PLAY].box))
+     {
+          buttons[PLAY].bg.a = 60;
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                Gameplay ();
+     }
+     else buttons[PLAY].bg.a = 120;
      strcpy (s, "Options");
-     buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
-     if (CheckCollisionPointRec (input, buttons[OPTIONS]))
+     buttons[OPTIONS].box = DrawTextButton (s, size, w, w.x*0.06f, buttons[OPTIONS].bg, buttons[OPTIONS].fg);
+     if (CheckCollisionPointRec (input, buttons[OPTIONS].box))
+     {
+          buttons[OPTIONS].bg.a = 60;
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                OptionsMenu();
+     }
+     else buttons[OPTIONS].bg.a = 120;
      strcpy (s, "Stats");
-     buttons[STATS] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
-     if (CheckCollisionPointRec (input, buttons[STATS]))
+     buttons[STATS].box = DrawTextButton (s, size, w, w.x*0.12f, buttons[STATS].bg, buttons[STATS].fg);
+     if (CheckCollisionPointRec (input, buttons[STATS].box))
+     {
+          buttons[STATS].bg.a = 60;
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+          {
+               ClearBackground(BLACK);
                StatsMenu();
+          }
+     }
+     else buttons[STATS].bg.a = 120;
      strcpy (s, "Quit");
-     buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
-     if (CheckCollisionPointRec (input, buttons[QUIT]))
+     buttons[QUIT].box = DrawTextButton (s, size, w, w.x*0.18f, buttons[QUIT].bg, buttons[QUIT].fg);
+     if (CheckCollisionPointRec (input, buttons[QUIT].box))
+     {
+          buttons[QUIT].bg.a = 60;
           if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                game.close = 1;
+     }
+     else buttons[QUIT].bg.a = 120;
 }
 
 void InitMenu (void)
@@ -385,6 +404,7 @@ void InitMenu (void)
           w.x/24,
      };
      Color fg = YELLOW, bg = { 40, 40, 40, 120 };
+     SetTargetFPS(60);
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -397,67 +417,81 @@ void InitMenu (void)
           };
           Vector2 input = GetMousePosition();
           mouse = CheckCollisionPointRec (input, textbox);
+          int key = GetCharPressed();
+          while (key > 0)
+          {
+               if (key >= 32 && key <= 125 && lc < (int)sizeof (name)-1)
+               {
+                    name[lc] = (char) key;
+                    name[++lc] = '\0';
+               }
+               key = GetCharPressed();
+          }
+          if (IsKeyPressed (KEY_BACKSPACE))
+          {
+               lc--;
+               if (lc < 0) lc = 0;
+               name[lc] = '\0';
+          }
+          
           if (mouse)
           {
                SetMouseCursor (MOUSE_CURSOR_IBEAM);
-               int key = GetCharPressed();
-               while (key > 0)
-               {
-                    if (key >= 32 && key <= 125 && lc < (int)sizeof (name)-1)
-                    {
-                         name[lc] = (char) key;
-                         name[++lc] = '\0';
-                    }
-                    key = GetCharPressed();
-               }
-               if (IsKeyPressed (KEY_BACKSPACE))
-               {
-                    lc--;
-                    if (lc < 0) lc = 0;
-                    name[lc] = '\0';
-               }
+               fc = 0;
           }
-          else SetMouseCursor (MOUSE_CURSOR_DEFAULT);
-          if (mouse) fc++;
-          else fc = 0;
+          else
+          {
+               SetMouseCursor (MOUSE_CURSOR_DEFAULT);
+               fc++;
+          }
           BeginDrawing();
                ClearBackground (BLACK);
-               DrawBackground (180, 1);
+               Texture2D sprite = DrawBackground (180, 1);
                DrawRectangleRec (textbox, bg);
                //if (mouse) DrawRectangleLinesEx (textbox, w.x/500, RED);
                //else DrawRectangleLinesEx (textbox, w.x/500, DARKGRAY);
                if (mouse) bg.a = 60;
                else bg.a = 120;
                DrawText (name, (int) textbox.x+w.x/200, textbox.y, w.x/25, fg);
-               if (mouse)
+               //if (mouse)
                     if (lc < (int) sizeof (name))
-                         if ((fc/20)%2 == 0)
+                         if ((fc/30)%2 == 0)
                               DrawText ("|", textbox.x+w.x/200+MeasureText(name, w.x/25), textbox.y, w.x/25, fg);
                if (IsKeyPressed (KEY_ENTER))
                    strcpy (player[0].name, name);
                DrawMenu();
           EndDrawing();
-               if (IsKeyPressed(KEY_Q))
-                    game.close = 1;
-               if (game.close)
-                    break;
+          if (IsTextureReady(sprite))
+               UnloadTexture (sprite);
+          if (IsKeyPressed(KEY_Q))
+               game.close = 1;
+          if (game.close)
+               break;
      }
 }
 
-void DrawPauseButton (void)
+Buttons DrawPauseButton (void)
 {
-     Texture2D sprite = LoadTexture ("./res/images/pause-button");
+     Texture2D sprite = LoadTexture ("./res/images/pause-button.png");
      Rectangle rect = {
           .width = 32,
           .height = 32,
      };
      Color c = WHITE;
-     c.a = 0;
+     c.a = 200;
      SetShapesTexture (sprite, rect);
-     DrawRectangle (w.x-33, 1, 32, 32, c);
-     Vector2 input = GetMousePosition();
-     if (CheckCollisionPointRec (input, rect))
-          PauseMenu();
+     rect = (Rectangle) {
+          w.x-49,
+          1,
+          48,
+          48,
+     };
+     //DrawRectangle (w.x-49, 1, 48, 48, c);
+     DrawRectangleRec (rect, c);
+     return (Buttons) {
+          .sprite = sprite,
+          .box = rect,
+     };
 }
 
 void UpdateAudio (void)
@@ -475,6 +509,7 @@ void UpdateAudio (void)
 
 void StatsMenu (void)
 {
+     SetTargetFPS(60);
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -485,13 +520,13 @@ void StatsMenu (void)
           Color fg = YELLOW, bg = { 40, 40, 40, 150 };
           BeginDrawing();
                ClearBackground (BLACK);
-               DrawBackground (180, 1);
+               Texture2D sprite = DrawBackground (180, 1);
                strcpy (s, "Stats"); // menu title
                Vector2 mid = CenterText (s, size, w);
                DrawText (s, mid.x, w.y*0.10f, size, YELLOW);
                strcpy (s, "Latest Matches");
-               buttons[PLAY] = DrawTextButton (s, size/2, half, 0, bg, fg);
-               int i = 0;  
+               buttons[PLAY].box = DrawTextButton (s, size/2, half, 0, bg, fg);
+               int i = 0;
                for (i = 0; i < entrynum; i++)
                {
                     if (atoi(entries[i][2]) == 0)
@@ -515,11 +550,17 @@ void StatsMenu (void)
                }
                Vector2 input = GetMousePosition();
                strcpy (s, "Back");
-               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[BACK]))
+               buttons[BACK].box = DrawTextButton (s, size, w, w.x*0.18f, buttons[BACK].bg, buttons[BACK].fg);
+               if (CheckCollisionPointRec (input, buttons[BACK].box))
+               {
+                    buttons[BACK].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          break;
+               }
+               else buttons[BACK].bg.a = 120;
           EndDrawing();
+          if (IsTextureReady(sprite))
+               UnloadTexture (sprite);
           if (IsKeyPressed (KEY_Q))
                game.close = 1;
           if (game.close) 
@@ -530,6 +571,7 @@ void StatsMenu (void)
 void PauseMenu (void)
 {
      game.pausenum++;
+     SetTargetFPS(60);
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -537,39 +579,56 @@ void PauseMenu (void)
           int size = w.x/20;
           char s[30];
           Vector2 input = GetMousePosition();
-          Color fg = YELLOW, bg = { 40, 40, 40, 2 };
+          for (int i = PLAY; i <= QUIT; i++)
+               buttons[i].bg.a = 2;
+          Texture2D sprite;
           BeginDrawing();
                if (game.pausenum % 2 == 0)
                {
                     ClearBackground (BLACK);
-                    bg.a = 150;
-                    DrawBackground (180, 0);
+                    sprite = DrawBackground (180, 0);
+                    for (int i = PLAY; i <= QUIT; i++)
+                         buttons[i].bg.a = 150;
                }
                
                strcpy (s, "Paused!");
                Vector2 mid = CenterText (s, size, w);
                DrawText (s, mid.x, mid.y/2, size, YELLOW);
                strcpy (s, "Resume");
-               buttons[PLAY] = DrawTextButton (s, size, w, 0, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[PLAY]))
+               buttons[PLAY].box = DrawTextButton (s, size, w, 0, buttons[PLAY].bg, buttons[PLAY].fg);
+               if (CheckCollisionPointRec (input, buttons[PLAY].box))
+               {
+                    buttons[PLAY].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          break;
+               }
+               else buttons[PLAY].bg.a = 120;
                strcpy (s, "Options");
-               buttons[OPTIONS] = DrawTextButton (s, size, w, w.x*0.06f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[OPTIONS]))
+               buttons[OPTIONS].box = DrawTextButton (s, size, w, w.x*0.06f, buttons[OPTIONS].bg, buttons[OPTIONS].fg);
+               if (CheckCollisionPointRec (input, buttons[OPTIONS].box))
+               {
+                    buttons[OPTIONS].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                     {
                          OptionsMenu();
                          game.pausenum++;
                          UpdateAudio(); // audio must be updated when the game is resumed
                     }
+               }
+               else buttons[OPTIONS].bg.a = 120;
                strcpy (s, "Quit to Menu");
-               buttons[QUIT] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[QUIT]))
+               buttons[QUIT].box = DrawTextButton (s, size, w, w.x*0.12f, buttons[QUIT].bg, buttons[QUIT].fg);
+               if (CheckCollisionPointRec (input, buttons[QUIT].box))
+               {
+                    buttons[QUIT].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          InitMenu();
+               }
+               else buttons[QUIT].bg.a = 120;
                
           EndDrawing();
+          if (IsTextureReady (sprite))
+               UnloadTexture (sprite);
           if (IsKeyPressed(KEY_Q))
                game.close = 1;
           if (game.close)
@@ -579,6 +638,7 @@ void PauseMenu (void)
 
 void OptionsMenu (void)
 {
+     SetTargetFPS(60);
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -587,20 +647,23 @@ void OptionsMenu (void)
           char s[30];
           size = w.x/20;
           Vector2 input = GetMousePosition();
-          Color fg = YELLOW, bg = { 40, 40, 40, 150 };
           BeginDrawing();
                ClearBackground (BLACK);
-               DrawBackground (180, 1);
+               Texture2D sprite = DrawBackground (180, 1);
                
                strcpy (s, "Options");
                Vector2 mid = CenterText (s, size, w);
                DrawText (s, mid.x, mid.y/2, size, YELLOW);
                strcpy (s, "Sfx: ");
                Vector2 half = { w.x/2, w.y }, slider[10][2];
-               buttons[SFX] = DrawTextButton (s, size, half, 0, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[SFX]))
+               buttons[SFX].box = DrawTextButton (s, size, half, 0, buttons[SFX].bg, buttons[SFX].fg);
+               if (CheckCollisionPointRec (input, buttons[SFX].box))
+               {
+                    buttons[SFX].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          printf ("SFX\n");
+               }
+               else buttons[SFX].bg.a = 120;
                slider[SFX][0] = (Vector2) { 0.35f * w.x, w.y/2 };
                slider[SFX][1] = (Vector2) { 0.80f * w.x, w.y/2 };
                DrawLineEx (slider[SFX][0], slider[SFX][1], w.x/100, YELLOW);
@@ -618,10 +681,14 @@ void OptionsMenu (void)
                DrawCircleV (circle[0], w.x/75, YELLOW);
                input = GetMousePosition();
                strcpy (s, "Music: ");
-               buttons[MUS] = DrawTextButton (s, size, half, w.x*0.06f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[MUS]))
+               buttons[MUS].box = DrawTextButton (s, size, half, w.x*0.06f, buttons[MUS].bg, buttons[MUS].fg);
+               if (CheckCollisionPointRec (input, buttons[MUS].box))
+               {
+                    buttons[MUS].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          printf ("Music\n");
+               }
+               else buttons[MUS].bg.a = 120;
                slider[MUS][0] = (Vector2) { 0.35f * w.x, w.y/2+w.x*0.06f };
                slider[MUS][1] = (Vector2) { 0.80f * w.x, w.y/2+w.x*0.06f };
                DrawLineEx (slider[MUS][0], slider[MUS][1], w.x/100, YELLOW);
@@ -640,19 +707,29 @@ void OptionsMenu (void)
                if (game.difficulty)
                     strcat (s, "Hard");
                else strcat (s, "Easy");
-               buttons[DIFF] = DrawTextButton (s, size, w, w.x*0.12f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[DIFF]))
+               buttons[DIFF].box = DrawTextButton (s, size, w, w.x*0.12f, buttons[DIFF].bg, buttons[DIFF].fg);
+               if (CheckCollisionPointRec (input, buttons[DIFF].box))
+               {
+                    buttons[DIFF].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          //change difficulty so long as the game hasn't started
                          if (!game.start)
                               game.difficulty = !game.difficulty;
-                         
+               }
+               else buttons[DIFF].bg.a = 120;
+
                strcpy (s, "Back");
-               buttons[BACK] = DrawTextButton (s, size, w, w.x*0.18f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[BACK]))
+               buttons[BACK].box = DrawTextButton (s, size, w, w.x*0.18f, buttons[DIFF].bg, buttons[DIFF].fg);
+               if (CheckCollisionPointRec (input, buttons[BACK].box))
+               {
+                    buttons[BACK].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          break;
+               }
+               else buttons[BACK].bg.a = 120;
           EndDrawing();
+          if (IsTextureReady (sprite))
+               UnloadTexture (sprite);
           if (IsKeyPressed(KEY_Q))
                game.close = 1;
           if (IsKeyPressed(KEY_F))
@@ -664,6 +741,7 @@ void OptionsMenu (void)
 
 void EndMenu (void)
 {
+     SetTargetFPS(60);
      while (!WindowShouldClose())
      {
           w.x = GetRenderWidth();
@@ -679,7 +757,6 @@ void EndMenu (void)
                w.y,
           };
           Vector2 input = GetMousePosition();
-          Color fg = YELLOW, bg = { 40, 40, 40, 120 };
           BeginDrawing();
                //ClearBackground (BLACK);
                //DrawBackground (255, 0);
@@ -709,15 +786,23 @@ void EndMenu (void)
                     DrawText (s, mid.x, (mid.y/2)*1.5f, size, RED);
                }
                strcpy (s, "Play Again");
-               buttons[PLAY] = DrawTextButton (s, size, half, w.x*0.10f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[PLAY]))
+               buttons[PLAY].box = DrawTextButton (s, size, half, w.x*0.10f, buttons[PLAY].bg, buttons[PLAY].fg);
+               if (CheckCollisionPointRec (input, buttons[PLAY].box))
+               {
+                    buttons[PLAY].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          Gameplay();
+               }
+               else buttons[PLAY].bg.a = 120;
                strcpy (s, "Quit to Menu");
-               buttons[QUIT] = DrawTextButton (s, size, most, w.x*0.10f, bg, fg);
-               if (CheckCollisionPointRec (input, buttons[QUIT]))
+               buttons[QUIT].box = DrawTextButton (s, size, most, w.x*0.10f, buttons[QUIT].bg, buttons[QUIT].fg);
+               if (CheckCollisionPointRec (input, buttons[QUIT].box))
+               {
+                    buttons[QUIT].bg.a = 60;
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                          InitMenu();
+               }
+               else buttons[QUIT].bg.a = 120;
                
           EndDrawing();
           if (IsKeyPressed(KEY_Q))
@@ -876,7 +961,7 @@ void DrawEntities (void)
      for (int i = 1; i <= bomb[0].num; i++)
           if (bomb[i].x && bomb[i].y)
                DrawTexture (bomb[i].sprite, bomb[i].x, bomb[i].y, WHITE);
-     if (game.score > apple[0].num * diff.reveal.a && game.score < apple[0].num * diff.reveal.b)
+     if (game.score > apple[0].num * diff.reveal.left && game.score < apple[0].num * diff.reveal.right)
      {
           char s[] = "Hidden apples have been revealed!\0";
           int size = w.x/20;
@@ -890,6 +975,30 @@ void DrawEntities (void)
      DrawTexture (player[1].sprite, player[1].x, player[1].y, WHITE);
 }
 
+void UnloadEntities (void)
+{
+     for (int i = 1; i <= apple[0].num; i++)
+          if (apple[i].x && apple[i].y)
+               if (IsTextureReady(apple[i].sprite))
+                    UnloadTexture (apple[i].sprite);
+     for (int i = 1; i <= grass[0].num; i++)
+          if (grass[i].x && grass[i].y)
+               if (IsTextureReady(grass[i].sprite))
+                    UnloadTexture (grass[i].sprite);
+     for (int i = 1; i <= tree[0].num; i++)
+          if (tree[i].x && tree[i].y)
+               if (IsTextureReady(tree[i].sprite))
+                    UnloadTexture (tree[i].sprite);
+     for (int i = 1; i <= bomb[0].num; i++)
+          if (bomb[i].x && bomb[i].y)
+               if (IsTextureReady(bomb[i].sprite))
+                    UnloadTexture (bomb[i].sprite);
+     if (IsTextureReady (player[0].sprite))
+          UnloadTexture (player[0].sprite);
+     if (IsTextureReady (player[1].sprite))
+          UnloadTexture (player[1].sprite);
+}
+
 void CalcCollisions (void)
 {
      char buffer[101];
@@ -899,7 +1008,7 @@ void CalcCollisions (void)
           {
                game.score += diff.score;
                game.health += diff.health.inc.player;
-               player[0].speed += diff.speed.player.inc;
+               player[0].speed += diff.speed.inc.player;
                apple[i].used = 1;
                apple[i].sprite = LoadTexture ("./res/images/grasstile.png");
                PlaySound (sound[2]); //eat
@@ -911,12 +1020,12 @@ void CalcCollisions (void)
      for (int i = 1; i <= bomb[0].num; i++)
      {
           //if the player collides with a bomb
-          if (IsCollision (&player[0], &bomb[i], col.bomb.p) && !bomb[i].used)
+          if (IsCollision (&player[0], &bomb[i], col.bomb.player) && !bomb[i].used)
           {
                PlaySound (sound[3]); //boom
                PlaySound (sound[1]); //oof
                game.health -= diff.health.dec.player;
-               player[0].speed -= diff.speed.player.dec;
+               player[0].speed -= diff.speed.dec.player;
                if (player[0].speed < 0.0f)
                     player[0].speed = 0.0f;
                bomb[i].used = 1;
@@ -927,10 +1036,10 @@ void CalcCollisions (void)
                rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
           }
           //if the enemy collides with a bomb
-          if (IsCollision(&player[1], &bomb[i], col.bomb.e) && !bomb[i].used)
+          if (IsCollision(&player[1], &bomb[i], col.bomb.enemy) && !bomb[i].used)
           {
                PlaySound (sound[3]); //boom
-               player[1].speed += diff.speed.enemy.inc;
+               player[1].speed += diff.speed.inc.enemy;
                bomb[i].used = 1;
                bomb[i].sprite = LoadTexture ("./res/images/bombtile.png");
                int rng = (bomb[i].x + bomb[i].y)/2;
@@ -944,7 +1053,7 @@ void CalcCollisions (void)
           if (game.delay == 0.0f)
           {
                PlaySound (sound[1]); //oof
-               player[0].speed -= diff.speed.player.dec;
+               player[0].speed -= diff.speed.dec.player;
                if (player[0].speed < 0.0f)
                     player[0].speed = 0.0f;
                game.health -= diff.health.dec.enemy;
@@ -998,23 +1107,28 @@ void Gameplay (void)
 
      //InitEntities();
      GenerateEntities();
+     SetTargetFPS(60);
      while (!WindowShouldClose() && !game.close)
      {
           w.x = GetScreenWidth();
           w.y = GetScreenHeight();
           if (!game.mutemusic)
                UpdateMusicStream(music[0]);
+          Vector2 input = GetMousePosition();
           PlayerMovement();
           EnemyMovement();
           CalcCollisions();
           BeginDrawing();
                ClearBackground(BLACK);
-               DrawBackground(255, 1);
+               Texture2D bgsprite = DrawBackground(255, 1);
+               Buttons pause = DrawPauseButton();
+               if (CheckCollisionPointRec (input, pause.box))
+                    if (IsMouseButtonReleased (MOUSE_BUTTON_LEFT))
+                         PauseMenu();
                DrawEntities();
                DrawHUD();
                if (IsKeyPressed (KEY_P))
                     PauseMenu();
-               DrawPauseButton();
           EndDrawing();
           if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
           {
@@ -1023,9 +1137,14 @@ void Gameplay (void)
                DrawHUD();
                DrawPauseButton();
           }
+          if (IsTextureReady (bgsprite))
+               UnloadTexture (bgsprite);
+          if (IsTextureReady (pause.sprite))
+               UnloadTexture (pause.sprite);
           if (IsKeyPressed (KEY_Q))
                game.close = 1;
      }
+     UnloadEntities();
      if (rc != SQLITE_OK)
      {
           fprintf (stderr, "Failed to select data\n");
