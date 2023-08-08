@@ -7,19 +7,19 @@ The game is controlled entirely via WASD, although you can also use keys such as
 # Screenshots
 
 
-<img src="./docs/images/menu1.png" alt="Initial menu" width="500" height="250"/>
+<img src="./docs/images/menu1.png" alt="Initial menu" width="640" height="360"/>
 
 The game's initial menu
 
-<img src="./docs/images/gameplay.png" alt="Gameplay" width="500" height="250"/>
+<img src="./docs/images/gameplay.png" alt="Gameplay" width="640" height="360"/>
 
 The gameplay
 
-<img src="./docs/images/win.png" alt="You won!" width="500" height="250"/>
+<img src="./docs/images/win.png" alt="You won!" width="640" height="360"/>
 
 The end of the game
 
-<img src="./docs/images/menu2.png" alt="3 in 1" width="1500" height="250"/>
+<img src="./docs/images/menu2.png" alt="3 in 1" width="1920" height="360"/>
 
 Other menus (which took me quite a bit of time to code)
 
