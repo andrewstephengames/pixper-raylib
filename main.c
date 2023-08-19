@@ -123,6 +123,8 @@ int main (int argc, char **argv)
 {
      SetConfigFlags(FLAG_WINDOW_RESIZABLE);
      InitWindow(w.x, w.y, "Pixper");
+     Image icon = LoadImage ("./res/images/icon.png");
+     SetWindowIcon (icon);
      InitAudioDevice();
      SetTargetFPS(60);
      SetTraceLogLevel(LOG_ERROR);
