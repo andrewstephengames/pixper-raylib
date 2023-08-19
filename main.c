@@ -1,4 +1,3 @@
-//TODO: add feature to buy an apple reveal using the score acquired
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> //for strcat, strcpy, strlen and strcmp
@@ -94,7 +93,6 @@ char *err_msg, sql[500], entries[5][3][50];
 int rc, entrynum;
 
 // all functions used
-// FIXME: refactoring
 int callback(void *NotUsed, int argc, char **argv, char **azColName);
 void Commandline (int argc, char **argv);
 bool IsCollision (Entity *a, Entity *b, float c);
@@ -221,8 +219,8 @@ void SetDifficulty (bool difficulty)
           a = 25;
           t = 40;
           b = 20;
-          player[0].speed = 2.5f;
-          player[1].speed = 2.5f;
+          player[0].speed = 3.0f;
+          player[1].speed = 1.5f;
           game.health = 5;
           // Interval of apple percentage consumed for the hidden apples to be revealed
           diff.reveal.left = 0.75f;
@@ -246,11 +244,11 @@ void SetDifficulty (bool difficulty)
           // Collision with an apple
           col.apple = 5;
           // Player collision with a bomb
-          col.bomb.player = 30;
+          col.bomb.player = 20;
           // Enemy collision with a bomb
-          col.bomb.enemy = 30;
+          col.bomb.enemy = 40;
           // Player collision with the enemy
-          col.enemy = 30;
+          col.enemy = 20;
      }
      else
      {
@@ -481,17 +479,17 @@ Buttons DrawPauseButton (void)
      c.a = 200;
      SetShapesTexture (sprite, rect);
      rect = (Rectangle) {
-          w.x-49,
-          1,
+          w.x-48,
+          0,
           48,
           48,
      };
-     //DrawRectangle (w.x-49, 1, 48, 48, c);
      DrawRectangleRec (rect, c);
-     return (Buttons) {
+     Buttons pause = {
           .sprite = sprite,
           .box = rect,
      };
+     return pause;
 }
 
 void UpdateAudio (void)
@@ -1130,7 +1128,16 @@ void Gameplay (void)
                if (IsKeyPressed (KEY_P))
                     PauseMenu();
           EndDrawing();
-          if (IsWindowResized()) //|| IsWindowMaximized()) //TODO: Maximized
+//FIXME: check for maximized window only when the window state is cleared 
+//          if (IsWindowState (FLAG_WINDOW_MAXIMIZED))
+//          {
+//               GenerateEntities();
+//               DrawEntities();
+//               DrawHUD();
+//               DrawPauseButton();
+//               ClearWindowState (FLAG_WINDOW_MAXIMIZED);
+//          }
+          if (IsWindowResized()) 
           {
                GenerateEntities();
                DrawEntities();
