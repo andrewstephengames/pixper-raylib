@@ -1,5 +1,7 @@
 #!/bin/sh
 
+[[ -z $1 ]] && echo "Please provide the .c file as an argument." ; exit
+
 set -xe
 CFLAGS="-Wall -Wextra -ggdb -I. `pkg-config --cflags raylib`"
 
