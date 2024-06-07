@@ -25,30 +25,9 @@ Other menus (which took me quite a bit of time to code)
 
 # How do I play?
 
-The game is only available for Windows and Linux. A port for Android is planned.
+The game is available on the Web, <a href="https://andrewstephen.xyz/pixper">click here</a> to play.
 
-# Instructions for Windows
-
-* Download: https://andrewstephen.xyz/pixper.exe
-* Run `pixper.exe` (in case Windows complains about the program being malicious, run anyway, the reason for such an error is that I have not purchased a certificate to verify this program with Microsoft - in case that sounds spooky to you - read the _Building on Windows_ instructions - you can "compile" a build of your own)
-* **Enjoy!**
-
-# Building on Windows
-
-* Install git: https://gitforwindows.org/
-* Open Powershell or Windows Terminal, NOT cmd
-<!-- * **Enjoy!** -->
-* TODO
-
-# Instructions for Linux
-
-* Compile/install raylib from the official documentation: https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux
-* Open your favorite terminal emulator
-* `sudo apt install libsqlite3-dev` (Debian/Ubuntu - for other distros look up _distroname_ install pip)
-* `git clone https://github.com/andrewstephengames/pixper-raylib`
-* `cd pixper-raylib`
-* `./build-linux`
-* **Enjoy!**
+The game is also available for Windows and Linux. Check the <a href="https://github.com/andrewstephengames/pixper-raylib/releases">releases</a> page.
 
 # Building on Linux
 
@@ -59,4 +38,3 @@ The game is only available for Windows and Linux. A port for Android is planned.
 * `cd pixper-raylib`
 * `./build-linux`
 * **Enjoy!**
-
